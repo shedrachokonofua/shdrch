@@ -16,7 +16,7 @@ tasks:
         -w /var/www/html/public
         php:8.4-cli-alpine php -S 0.0.0.0:8000
 
-  generate-images:
+  dev:generate-images:
     desc: Generate background images
     cmds:
       - mkdir -p storage/images

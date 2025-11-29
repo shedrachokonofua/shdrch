@@ -1,69 +1,45 @@
 # shdr.ch
 
-Personal website hosted on Dokku via GitLab CI/CD.
+Personal [website](https://shdr.ch) with AI-generated backgrounds. Deployed to Dokku via GitLab CI/CD.
 
-## Structure
+## Infrastructure
 
-```
-shdrch/
-├── index.php           # Main landing page (PHP)
-├── Taskfile.yml        # Local dev task runner
-├── .gitlab-ci.yml      # CI/CD pipeline
-├── tofu/
-│   └── main.tf         # Dokku app infrastructure
-└── README.md
-```
+Hosted on aether. Infrastructure managed with OpenTofu (`tofu/main.tf`).
 
-## Local Development
+Depends on aether services:
 
-Run the dev server:
+- **Dokku** — PaaS
+- **GitLab** — CI/CD, OpenTofu state backend
+- **Infisical** — Secrets management
+- **LiteLLM** — LLM gateway for prompt generation
+- **ComfyUI** — Image generation
+
+## Development
 
 ```bash
-task dev
+task dev                  # Start dev server at http://localhost:8000
+task dev:generate-images  # Generate new background images for dev server
 ```
 
-This starts a PHP server at http://localhost:8000 using Podman.
+Requires Taskfile, Podman and [Infisical CLI](https://infisical.com/docs/cli/overview) to develop locally.
 
 ## Deployment
 
-Deployment is fully automated via GitLab CI/CD on push to `main`:
+Automatic on push to `main`. Requires `DOKKU_SSH_KEY` set in CI/CD variables.
 
-1. **infra** stage: Runs `tofu apply` to ensure Dokku app exists
-2. **deploy** stage: Pushes code to Dokku
+## URLs
 
-### CI/CD Requirements
+- https://shdr.ch
+- https://shdrch.kk.home.shdr.ch (internal)
 
-Set these GitLab CI/CD variables:
+## Image Generation
 
-- `DOKKU_SSH_KEY` - SSH private key with access to Dokku server
+Background images are AI-generated historical photographs. A cron job regenerates all 20 images weekly (Sundays 4am):
 
-### Manual Infrastructure Setup
+1. Pick a random region/era combination
+2. LLM generates a descriptive prompt
+3. ComfyUI renders the image
 
-If running OpenTofu locally:
+On each page load, one of the 20 images is randomly selected as the background.
 
-```bash
-cd tofu
-# Create backend.conf from backend.conf.example for state config
-tofu init -backend-config=backend.conf
-tofu apply
-```
-
-## Accessing the Site
-
-- **Internal**: https://shdrch.kk.home.shdr.ch
-- **External**: https://shdr.ch
-
-## Troubleshooting
-
-### Check app status
-
-```bash
-ssh -p 2222 dokku@10.0.3.14 apps:list
-ssh -p 2222 dokku@10.0.3.14 logs shdrch
-```
-
-### Rebuild app
-
-```bash
-ssh -p 2222 dokku@10.0.3.14 ps:rebuild shdrch
-```
+Run `task dev:generate-images` locally.

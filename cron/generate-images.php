@@ -6,7 +6,6 @@ $litellmHost = getenv('LITELLM_HOST');
 $comfyuiHost = getenv('COMFYUI_HOST') ?: 'https://comfyui.home.shdr.ch';
 $outputDir = getenv('IMAGE_OUTPUT_DIR') ?: '/app/storage/images';
 
-// Available models to randomly pick from
 $llmModels = [
   'aether/qwen3:8b',
 ];
@@ -15,7 +14,6 @@ $imageModels = [
   'z_image_turbo_bf16.safetensors',
 ];
 
-// Regions and eras for true randomness (LLMs aren't random)
 $regions = [
   'West Africa (Mali, Ghana, Benin)',
   'East Africa (Ethiopia, Swahili Coast)',
@@ -52,7 +50,6 @@ $eras = [
   '1920s-1930s',
 ];
 
-// Ensure output directory exists
 if (!is_dir($outputDir)) {
   mkdir($outputDir, 0755, true);
 }
@@ -75,7 +72,6 @@ for ($i = 1; $i <= 20; $i++) {
   echo "  LLM: $llmModel | Image: $imageModel\n";
   echo "  Setting: $era in $region\n";
 
-  // Step 1: Generate a unique image prompt
   $promptInstruction = <<<PROMPT
 Write a 3-4 sentence image prompt for a realistic historical photograph from $era in $region.
 
@@ -107,17 +103,14 @@ PROMPT;
 
   echo "  Prompt: " . substr($imagePrompt, 0, 80) . "...\n";
 
-  // Step 2: Inject prompt and model into workflow
   $currentWorkflow = $workflow;
   $currentWorkflow['6']['inputs']['text'] = $imagePrompt;
   $currentWorkflow['16']['inputs']['unet_name'] = $imageModel;
 
-  // Step 3: Queue in ComfyUI
   $response = $http->post('/prompt', ['json' => ['prompt' => $currentWorkflow]]);
   $result = json_decode($response->getBody()->getContents(), true);
   $promptId = $result['prompt_id'];
 
-  // Step 4: Poll for completion
   $outputImage = null;
   $attempts = 0;
   $maxAttempts = 120; // 2 minutes timeout per image
@@ -144,7 +137,6 @@ PROMPT;
     continue;
   }
 
-  // Step 5: Download the image
   $imageUrl = '/view?' . http_build_query([
     'filename' => $outputImage['filename'],
     'subfolder' => $outputImage['subfolder'] ?? '',
@@ -154,7 +146,6 @@ PROMPT;
   $imageResponse = $http->get($imageUrl);
   $imageData = $imageResponse->getBody()->getContents();
 
-  // Step 6: Save to disk (overwrites existing)
   $filename = sprintf('image_%02d.png', $i);
   $filepath = $outputDir . '/' . $filename;
 
@@ -174,7 +165,6 @@ PROMPT;
   echo "  Saved: $filename\n";
 }
 
-// Save metadata (overwrites existing)
 $metadataFile = $outputDir . '/metadata.json';
 file_put_contents($metadataFile, json_encode($results, JSON_PRETTY_PRINT));
 

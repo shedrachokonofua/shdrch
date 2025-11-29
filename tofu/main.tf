@@ -1,8 +1,5 @@
 terraform {
-  # GitLab-managed state - automatically configured in CI via env vars:
-  # TF_HTTP_ADDRESS, TF_HTTP_LOCK_ADDRESS, TF_HTTP_UNLOCK_ADDRESS
-  # TF_HTTP_USERNAME, TF_HTTP_PASSWORD
-  #
+  # GitLab-managed state
   # For local dev, create backend.conf from backend.conf.example
   # and run: tofu init -backend-config=backend.conf
   backend "http" {}
@@ -44,9 +41,6 @@ provider "dokku" {
   ssh_cert = file(pathexpand(var.dokku_ssh_cert))
 }
 
-# Infisical provider - reads from env vars:
-# - INFISICAL_MACHINE_IDENTITY_ID (identity_id)
-# - INFISICAL_AUTH_JWT (JWT from GitLab id_tokens)
 provider "infisical" {
   host = "https://infisical.home.shdr.ch"
   auth = {
@@ -72,7 +66,6 @@ resource "infisical_secret" "litellm_api_key" {
   }
 }
 
-# Create the Dokku app
 resource "dokku_app" "shdrch" {
   app_name = "shdrch"
 
@@ -93,8 +86,6 @@ resource "dokku_app" "shdrch" {
     IMAGE_OUTPUT_DIR = "/app/storage/images"
   }
 
-  # Persistent storage for generated images
-  # https://dokku.com/docs/advanced-usage/persistent-storage/
   storage = {
     images = {
       mount_path = "/app/storage/images"
@@ -102,7 +93,6 @@ resource "dokku_app" "shdrch" {
   }
 }
 
-# Output the app name for reference
 output "app_name" {
   value = dokku_app.shdrch.app_name
 }
