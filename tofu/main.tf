@@ -44,6 +44,9 @@ provider "dokku" {
   ssh_cert = file(pathexpand(var.dokku_ssh_cert))
 }
 
+# Infisical provider - reads from env vars:
+# - INFISICAL_MACHINE_IDENTITY_ID (identity_id)
+# - INFISICAL_AUTH_JWT (JWT from GitLab id_tokens)
 provider "infisical" {
   host = "https://infisical.home.shdr.ch"
   auth = {

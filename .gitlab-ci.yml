@@ -24,6 +24,9 @@ infra:
     - .tofu_variables
     - .tofu_job
   stage: infra
+  id_tokens:
+    INFISICAL_AUTH_JWT:
+      aud: https://infisical.home.shdr.ch
   script:
     - cd ${TF_ROOT}
     - tofu init
