@@ -9,12 +9,47 @@ $outputDir = getenv('IMAGE_OUTPUT_DIR') ?: '/app/storage/images';
 // Available models to randomly pick from
 $llmModels = [
   'aether/qwen3:8b',
-  'aether/gemma3:27b',
-  'aether/mistral-small3.2',
 ];
 
 $imageModels = [
   'z_image_turbo_bf16.safetensors',
+];
+
+// Regions and eras for true randomness (LLMs aren't random)
+$regions = [
+  'West Africa (Mali, Ghana, Benin)',
+  'East Africa (Ethiopia, Swahili Coast)',
+  'North Africa (Egypt, Morocco, Tunisia)',
+  'Central Asia (Silk Road, Mongolia, Persia)',
+  'South Asia (India, Sri Lanka)',
+  'Southeast Asia (Khmer, Majapahit, Siam)',
+  'East Asia (China, Japan, Korea)',
+  'Pacific Islands (Polynesia, Melanesia)',
+  'Middle East (Mesopotamia, Levant, Arabia)',
+  'Mediterranean (Greece, Rome, Byzantium)',
+  'Western Europe (France, England, Spain)',
+  'Northern Europe (Scandinavia, Baltic)',
+  'Eastern Europe (Russia, Poland, Balkans)',
+  'Mesoamerica (Maya, Aztec)',
+  'South America (Inca, pre-Columbian)',
+  'North America (Indigenous nations, Colonial)',
+  'Australia (Aboriginal, Colonial)',
+  'Caribbean (Indigenous, Colonial)',
+];
+
+$eras = [
+  'ancient times (3000 BCE - 500 CE)',
+  'early medieval period (500-1000 CE)',
+  'high medieval period (1000-1300 CE)',
+  'late medieval period (1300-1500 CE)',
+  '16th century Renaissance',
+  '17th century Baroque era',
+  '18th century Enlightenment',
+  'early 19th century',
+  'mid 19th century Industrial Revolution',
+  'late 19th century',
+  'early 1900s (1900-1920)',
+  '1920s-1930s',
 ];
 
 // Ensure output directory exists
@@ -30,20 +65,39 @@ $workflow = json_decode(file_get_contents(__DIR__ . '/../comfyui-workflow.json')
 $results = [];
 
 for ($i = 1; $i <= 20; $i++) {
-  // Pick random models for this iteration
+  // Pick random models, region, and era for this iteration
   $llmModel = $llmModels[array_rand($llmModels)];
   $imageModel = $imageModels[array_rand($imageModels)];
+  $region = $regions[array_rand($regions)];
+  $era = $eras[array_rand($eras)];
 
-  echo "Generating image $i/@20...\n";
+  echo "Generating image $i/20...\n";
   echo "  LLM: $llmModel | Image: $imageModel\n";
+  echo "  Setting: $era in $region\n";
 
   // Step 1: Generate a unique image prompt
+  $promptInstruction = <<<PROMPT
+Write a 3-4 sentence image prompt for a realistic historical photograph from $era in $region.
+
+Describe it like a museum photo caption: plain language, no AI art buzzwords (no "8k", "cinematic", "masterpiece", etc).
+
+Include:
+- The specific scene or moment
+- Exact location details
+- Time of day and lighting
+- If people are present: their appearance and what they're doing
+
+CRITICAL: All clothing, tools, architecture, and technology must be historically accurate for $era. No anachronisms - only materials, techniques, and objects that existed in that specific time and place.
+
+Output ONLY the image prompt, nothing else.
+PROMPT;
+
   $response = $llmClient->post('/v1/chat/completions', [
     'headers' => ['Authorization' => "Bearer $apiKey"],
     'json' => [
       'model' => $llmModel,
       'messages' => [
-        ['role' => 'user', 'content' => 'Write a short image prompt (3-4 sentences) for a realistic historical scene. Pick any era/place randomly - ancient civilizations, medieval times, renaissance, industrial revolution, early 20th century, etc. Cover all continents and cultures. Describe it simply like a photograph caption - no flowery language, no "8k cinematic unreal engine" nonsense. Just: what, where, when, lighting. If there are people, describe them in detail in era-specific clothing. Be creative and diverse. Output ONLY the prompt, nothing else.'],
+        ['role' => 'user', 'content' => $promptInstruction],
       ],
     ],
   ]);
@@ -113,6 +167,8 @@ for ($i = 1; $i <= 20; $i++) {
     'filepath' => $filepath,
     'llm_model' => $llmModel,
     'image_model' => $imageModel,
+    'region' => $region,
+    'era' => $era,
   ];
 
   echo "  Saved: $filename\n";
