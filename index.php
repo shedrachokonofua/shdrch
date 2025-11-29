@@ -73,7 +73,7 @@ $ip = $_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 </head>
 <body>
   <div class="container">
-    <p class="greeting">$ hello <span><?php echo htmlspecialchars($ip, ENT_QUOTES, 'UTF-8'); ?></span></p>
+    <p class="greeting">$ hello, <span><?php echo htmlspecialchars($ip, ENT_QUOTES, 'UTF-8'); ?></span></p>
     <nav>
       <ul>
         <li><a href="https://github.com/shedrachokonofua">github</a></li>
