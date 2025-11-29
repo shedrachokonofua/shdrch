@@ -82,14 +82,23 @@ resource "dokku_app" "shdrch" {
 
   ports = {
     80 = {
-      scheme = "http"
+      scheme         = "http"
       container_port = 5000
     }
   }
 
   config = {
-    LITELLM_API_KEY = infisical_secret.litellm_api_key.value
-    LITELLM_HOST = "https://litellm.home.shdr.ch"
+    LITELLM_API_KEY  = infisical_secret.litellm_api_key.value
+    LITELLM_HOST     = "https://litellm.home.shdr.ch"
+    IMAGE_OUTPUT_DIR = "/app/storage/images"
+  }
+
+  # Persistent storage for generated images
+  # https://dokku.com/docs/advanced-usage/persistent-storage/
+  storage = {
+    images = {
+      mount_path = "/app/storage/images"
+    }
   }
 }
 

@@ -1,0 +1,10 @@
+{
+  "name": "shdrch",
+  "description": "Shedrach's personal corner of the internet",
+  "cron": [
+    {
+      "command": "php /app/cron/generate-images.php",
+      "schedule": "0 4 * * 0"
+    }
+  ]
+}

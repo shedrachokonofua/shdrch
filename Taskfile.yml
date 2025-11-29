@@ -4,4 +4,28 @@ tasks:
   dev:
     desc: Run local dev server
     cmds:
-      - podman run --rm -it -p 8000:8000 -v "$PWD":/var/www/html:Z -w /var/www/html php:8.3-cli-alpine php -S 0.0.0.0:8000
+      - mkdir -p storage/images
+      - >-
+        infisical run --env=prod --path=/ --
+        podman run --rm -it -p 8000:8000
+        -e LITELLM_API_KEY
+        -e LITELLM_HOST=https://litellm.home.shdr.ch
+        -e IMAGE_OUTPUT_DIR=/var/www/html/storage/images
+        -v "$PWD":/var/www/html:Z
+        -v "$PWD/storage/images":/var/www/html/public/images:Z
+        -w /var/www/html/public
+        php:8.4-cli-alpine php -S 0.0.0.0:8000
+
+  generate-images:
+    desc: Generate background images
+    cmds:
+      - mkdir -p storage/images
+      - >-
+        infisical run --env=prod --path=/ --
+        podman run --rm -it
+        -e LITELLM_API_KEY
+        -e LITELLM_HOST=https://litellm.home.shdr.ch
+        -e COMFYUI_HOST=https://comfyui.home.shdr.ch
+        -e IMAGE_OUTPUT_DIR=/var/www/html/storage/images
+        -v "$PWD":/var/www/html:Z -w /var/www/html
+        php:8.4-cli-alpine php cron/generate-images.php
