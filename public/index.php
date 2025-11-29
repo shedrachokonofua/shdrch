@@ -300,11 +300,11 @@ if (file_exists($metadataFile)) {
     <aside class="image-credit">
       <div class="meta">
         <?php if ($llmModel): ?>
-          <span><span class="label">prompt:</span>
+          <span><span class="label">prompt model:</span>
             <?php echo htmlspecialchars(basename($llmModel), ENT_QUOTES, 'UTF-8'); ?></span>
         <?php endif; ?>
         <?php if ($imageModel): ?>
-          <span><span class="label">image:</span>
+          <span><span class="label">image model:</span>
             <?php echo htmlspecialchars(str_replace('.safetensors', '', $imageModel), ENT_QUOTES, 'UTF-8'); ?></span>
         <?php endif; ?>
       </div>
