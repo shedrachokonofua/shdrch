@@ -12,6 +12,10 @@ terraform {
       source  = "aliksend/dokku"
       version = "~> 1.0"
     }
+    infisical = {
+      source  = "Infisical/infisical"
+      version = "~> 0.12"
+    }
   }
 }
 
@@ -38,6 +42,27 @@ provider "dokku" {
   ssh_port = var.dokku_ssh_port
   ssh_user = "dokku"
   ssh_cert = file(pathexpand(var.dokku_ssh_cert))
+}
+
+provider "infisical" {
+  host = "https://infisical.home.shdr.ch"
+  auth = {
+    oidc = {}
+  }
+}
+
+resource "infisical_project" "shdrch" {
+  name = "shdrch"
+  slug = "shdrch"
+  type = "secret-manager"
+}
+
+resource "infisical_secret" "litellm_api_key" {
+  name         = "LITELLM_API_KEY"
+  value        = "" # Set this value in the Infisical console
+  env_slug     = "prod"
+  folder_path  = "/"
+  workspace_id = infisical_project.shdrch.id
 }
 
 # Create the Dokku app
