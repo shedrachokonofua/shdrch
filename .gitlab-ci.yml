@@ -4,62 +4,35 @@ stages:
   - deploy
 
 variables:
-  SECRET_DETECTION_ENABLED: "true"
   TF_ROOT: ${CI_PROJECT_DIR}/tofu
-  TF_HTTP_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/shdrch
-  TF_HTTP_LOCK_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/shdrch/lock
-  TF_HTTP_UNLOCK_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/shdrch/lock
-  TF_HTTP_LOCK_METHOD: POST
-  TF_HTTP_UNLOCK_METHOD: DELETE
-  TF_HTTP_USERNAME: gitlab-ci-token
-  TF_HTTP_PASSWORD: ${CI_JOB_TOKEN}
+  TF_STATE_NAME: shdrch
+  DOKKU_APP: shdrch
 
 include:
   - template: Security/Secret-Detection.gitlab-ci.yml
+  - project: "aether/ci-templates"
+    ref: main
+    file:
+      - "/dokku/tofu.yml"
+      - "/dokku/deploy.yml"
 
 secret_detection:
   stage: secret-detection
 
 infra:
+  extends:
+    - .tofu_variables
+    - .tofu_job
   stage: infra
-  image:
-    name: ghcr.io/opentofu/opentofu:latest
-    entrypoint: ["/bin/sh", "-c"]
-  before_script:
-    - apk add --no-cache openssh-client
-    - mkdir -p ~/.ssh
-    - cp "$DOKKU_SSH_KEY" ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
   script:
     - cd ${TF_ROOT}
     - tofu init
     - tofu apply -auto-approve
-  cache:
-    key: tofu-${CI_COMMIT_REF_SLUG}
-    paths:
-      - ${TF_ROOT}/.terraform
-  resource_group: tofu
   only:
     - main
 
 deploy:
+  extends: .dokku_deploy
   stage: deploy
-  image: alpine:latest
-  before_script:
-    - apk add --no-cache git openssh-client
-    - eval $(ssh-agent -s)
-    - cat "$DOKKU_SSH_KEY" | ssh-add -
-    - mkdir -p ~/.ssh
-    - |
-      cat > ~/.ssh/config << EOF
-      Host 10.0.3.14
-        Port 2222
-        StrictHostKeyChecking no
-        UserKnownHostsFile /dev/null
-      EOF
-  script:
-    - git remote add dokku dokku@10.0.3.14:shdrch || true
-    - git push dokku HEAD:refs/heads/main --force
   only:
     - main
