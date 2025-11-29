@@ -1,5 +1,5 @@
 <?php
-$ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+$ip = $_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -55,7 +55,8 @@ $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
     nav a {
       color: #737373;
-      text-decoration: none;
+      text-decoration: underline;
+      text-underline-offset: 3px;
       font-size: 18px;
       transition: color 0.2s;
     }
