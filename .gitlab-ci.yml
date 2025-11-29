@@ -1,29 +1,65 @@
-# You can override the included template(s) by including variable overrides
-# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
-# Secret Detection customization: https://docs.gitlab.com/user/application_security/secret_detection/pipeline/configure
-# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
-# Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
-# Note that environment variables can be set in several places
-# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 stages:
-- build
-- test
-- deploy
-- review
-- dast
-- staging
-- canary
-- production
-- incremental rollout 10%
-- incremental rollout 25%
-- incremental rollout 50%
-- incremental rollout 100%
-- performance
-- cleanup
-- secret-detection
+  - secret-detection
+  - infra
+  - deploy
+
 variables:
-  SECRET_DETECTION_ENABLED: 'true'
+  SECRET_DETECTION_ENABLED: "true"
+  TF_ROOT: ${CI_PROJECT_DIR}/tofu
+  TF_HTTP_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/shdrch
+  TF_HTTP_LOCK_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/shdrch/lock
+  TF_HTTP_UNLOCK_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/shdrch/lock
+  TF_HTTP_LOCK_METHOD: POST
+  TF_HTTP_UNLOCK_METHOD: DELETE
+  TF_HTTP_USERNAME: gitlab-ci-token
+  TF_HTTP_PASSWORD: ${CI_JOB_TOKEN}
+
+include:
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
 secret_detection:
   stage: secret-detection
-include:
-- template: Auto-DevOps.gitlab-ci.yml
+
+infra:
+  stage: infra
+  image:
+    name: ghcr.io/opentofu/opentofu:latest
+    entrypoint: ["/bin/sh", "-c"]
+  before_script:
+    - apk add --no-cache openssh-client
+    - mkdir -p ~/.ssh
+    - cp "$DOKKU_SSH_KEY" ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+  script:
+    - cd ${TF_ROOT}
+    - tofu init
+    - tofu apply -auto-approve
+  cache:
+    key: tofu-${CI_COMMIT_REF_SLUG}
+    paths:
+      - ${TF_ROOT}/.terraform
+  resource_group: tofu
+  only:
+    - main
+
+deploy:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git openssh-client
+    - eval $(ssh-agent -s)
+    - cat "$DOKKU_SSH_KEY" | ssh-add -
+    - mkdir -p ~/.ssh
+    - |
+      cat > ~/.ssh/config << EOF
+      Host 10.0.3.14
+        Port 2222
+        StrictHostKeyChecking no
+        UserKnownHostsFile /dev/null
+      EOF
+  script:
+    - git remote add dokku dokku@10.0.3.14:shdrch || true
+    - git push dokku HEAD:refs/heads/main --force
+  only:
+    - main

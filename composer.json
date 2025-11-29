@@ -1,0 +1,7 @@
+{
+  "name": "shdrch/shdrch",
+  "description": "Personal website",
+  "require": {
+    "php": "^8.4"
+  }
+}

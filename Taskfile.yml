@@ -1,0 +1,7 @@
+version: "3"
+
+tasks:
+  dev:
+    desc: Run local dev server
+    cmds:
+      - podman run --rm -it -p 8000:8000 -v "$PWD":/var/www/html:Z -w /var/www/html php:8.3-cli-alpine php -S 0.0.0.0:8000
