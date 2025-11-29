@@ -61,11 +61,15 @@ resource "infisical_project" "shdrch" {
 }
 
 resource "infisical_secret" "litellm_api_key" {
-  name         = "LITELLM_API_KEY"
-  value        = "" # Set this value in the Infisical console
-  env_slug     = "prod"
-  folder_path  = "/"
+  name = "LITELLM_API_KEY"
+  value = "" # Set this value in the Infisical console
+  env_slug = "prod"
+  folder_path = "/"
   workspace_id = infisical_project.shdrch.id
+
+  lifecycle {
+    ignore_changes = [value]
+  }
 }
 
 # Create the Dokku app
@@ -76,11 +80,16 @@ resource "dokku_app" "shdrch" {
     "shdrch.kk.home.shdr.ch"
   ]
 
-    ports = {
+  ports = {
     80 = {
       scheme = "http"
       container_port = 5000
     }
+  }
+
+  config = {
+    LITELLM_API_KEY = infisical_secret.litellm_api_key.value
+    LITELLM_HOST = "https://litellm.home.shdr.ch"
   }
 }
 

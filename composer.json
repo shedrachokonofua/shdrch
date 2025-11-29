@@ -2,6 +2,8 @@
   "name": "shdrch/shdrch",
   "description": "Personal website",
   "require": {
-    "php": "^8.4"
+    "php": "^8.4",
+    "openai-php/client": "^0.10",
+    "guzzlehttp/guzzle": "^7.9"
   }
 }
