@@ -84,21 +84,27 @@ function makeDraggable(el, storageKey, defaultPos) {
   });
 }
 
-// Default positions
-const mainCardDefault = { left: "2rem", top: "2rem" };
+// Responsive default positions
+const isMobile = () => window.innerWidth < 640;
+const getMainCardDefault = () => {
+  const padding = isMobile() ? "1rem" : "2rem";
+  return { left: padding, top: padding };
+};
+
 const getCreditCardDefault = () => {
   const el = document.querySelector(".image-credit");
   if (!el) return null;
   const rect = el.getBoundingClientRect();
+  const padding = isMobile() ? 12 : 24;
   return {
-    left: window.innerWidth - rect.width - 24 + "px",
-    top: window.innerHeight - rect.height - 24 + "px",
+    left: Math.max(padding, window.innerWidth - rect.width - padding) + "px",
+    top: Math.max(padding, window.innerHeight - rect.height - padding) + "px",
   };
 };
 
 // Main card - top left
 const mainCard = document.querySelector(".container");
-makeDraggable(mainCard, "mainCardPos", mainCardDefault);
+makeDraggable(mainCard, "mainCardPos", getMainCardDefault());
 
 // Credit card - bottom right
 const creditCard = document.querySelector(".image-credit");
@@ -136,9 +142,10 @@ resetBtn.addEventListener("click", () => {
   localStorage.removeItem("creditCardPos");
 
   // Reset main card
+  const mainDefault = getMainCardDefault();
   mainCard.style.transition = "left 0.3s ease, top 0.3s ease";
-  mainCard.style.left = mainCardDefault.left;
-  mainCard.style.top = mainCardDefault.top;
+  mainCard.style.left = mainDefault.left;
+  mainCard.style.top = mainDefault.top;
   setTimeout(() => (mainCard.style.transition = ""), 300);
 
   // Reset credit card

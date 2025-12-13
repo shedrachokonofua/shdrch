@@ -36,7 +36,7 @@ if (file_exists($metadataFile)) {
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title><?php echo $siteName; ?></title>
   <meta name="description" content="<?php echo $description; ?>">
   <meta name="robots" content="index, follow">
@@ -52,6 +52,10 @@ if (file_exists($metadataFile)) {
   <meta name="twitter:url" content="<?php echo $canonicalUrl; ?>">
   <meta name="twitter:title" content="<?php echo $siteName; ?>">
   <meta name="twitter:description" content="<?php echo $description; ?>">
+
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <script type="application/ld+json">
   {
@@ -136,7 +140,7 @@ if (file_exists($metadataFile)) {
   </main>
 
   <?php if ($imagePrompt): ?>
-    <aside class="image-credit">
+    <aside class="image-credit" title="This background was AI-generated">
       <div class="meta">
         <span><span class="label">prompt model:</span>
           <?php echo htmlspecialchars(basename($llmModel), ENT_QUOTES, 'UTF-8'); ?></span>
