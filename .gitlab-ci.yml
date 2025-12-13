@@ -39,3 +39,16 @@ deploy:
   stage: deploy
   only:
     - main
+
+purge_cf_cache:
+  stage: deploy
+  needs: [deploy]
+  image: curlimages/curl:latest
+  script:
+    - |
+      curl -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+        -H "Authorization: Bearer ${CF_API_TOKEN}" \
+        -H "Content-Type: application/json" \
+        --data '{"purge_everything":true}'
+  only:
+    - main
