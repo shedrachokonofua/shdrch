@@ -136,7 +136,8 @@ if (file_exists($metadataFile)) {
         </li>
       </ul>
     </nav>
-    <footer>served by aether</footer>
+    <footer>served by <a href="https://github.com/shedrachokonofua/aether" target="_blank" rel="noopener">aether</a>
+    </footer>
   </main>
 
   <?php if ($imagePrompt): ?>

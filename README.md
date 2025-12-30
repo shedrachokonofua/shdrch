@@ -4,7 +4,7 @@ Personal [website](https://shdr.ch) with AI-generated backgrounds. Deployed to D
 
 ## Infrastructure
 
-Hosted on aether. Infrastructure managed with OpenTofu (`tofu/main.tf`).
+Hosted on [aether](https://github.com/shedrachokonofua/aether). Infrastructure managed with OpenTofu (`tofu/main.tf`).
 
 Depends on aether services:
 
