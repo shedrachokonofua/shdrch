@@ -1,9 +1,31 @@
-const apiKey    = requireEnv('LITELLM_API_KEY');
-const litellmHost  = requireEnv('LITELLM_HOST');
-const comfyuiHost  = process.env.COMFYUI_HOST || 'https://comfyui.home.shdr.ch';
-const upload       = process.env.UPLOAD === 'true';
+import { mkdir } from 'node:fs/promises';
+import sharp from 'sharp';
 
-const outputDir = process.env.IMAGE_OUTPUT_DIR || './storage/images';
+type Workflow = Record<string, any>;
+
+type GeneratedImage = {
+  index: number;
+  filename: string;
+  prompt: string;
+  filepath: string;
+  llm_model: string;
+  image_model: string;
+  region: string;
+  era: string;
+};
+
+type ManifestEntry = Omit<GeneratedImage, 'index' | 'filepath'>;
+
+type ComfyImage = {
+  filename: string;
+  subfolder?: string;
+  type?: string;
+};
+
+const IMAGE_COUNT = 20;
+const COMFYUI_POLL_ATTEMPTS = 120;
+const COMFYUI_POLL_INTERVAL_MS = 1000;
+const WEBP_OPTIONS = { quality: 82, effort: 4 };
 
 const llmModels = [
   'aether/qwen3.5-9b',
@@ -50,13 +72,17 @@ const eras = [
 ];
 
 function requireEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing required environment variable: ${name}`);
-  return v;
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing required environment variable: ${name}`);
+  return value;
 }
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function trimTrailingSlashes(url: string): string {
+  return url.replace(/\/+$/, '');
 }
 
 function sha256Hex(data: Uint8Array): string {
@@ -65,193 +91,277 @@ function sha256Hex(data: Uint8Array): string {
   return hasher.digest('hex');
 }
 
-import { mkdir } from 'node:fs/promises';
-import sharp from 'sharp';
+function buildImagePromptInstruction(era: string, region: string): string {
+  return `Write a 3-4 sentence image prompt for a realistic historical photograph from ${era} in ${region}.
+
+Describe it like a museum photo caption: plain language, no AI art buzzwords (no "8k", "cinematic", "masterpiece", etc).
+
+Include:
+- The specific scene or moment
+- Exact location details
+- Time of day and lighting
+- If people are present: their appearance and what they're doing
+
+CRITICAL: All clothing, tools, architecture, and technology must be historically accurate for ${era}. No anachronisms - only materials, techniques, and objects that existed in that specific time and place.
+
+Output ONLY the image prompt, nothing else.`;
+}
 
 async function ensureDir(dir: string) {
   await mkdir(dir, { recursive: true });
 }
 
+async function requestImagePrompt(config: {
+  litellmHost: string;
+  apiKey: string;
+  llmModel: string;
+  era: string;
+  region: string;
+}) {
+  const res = await fetch(`${config.litellmHost}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: config.llmModel,
+      messages: [{ role: 'user', content: buildImagePromptInstruction(config.era, config.region) }],
+    }),
+  });
+
+  if (!res.ok) throw new Error(`LLM request failed: ${res.status} ${await res.text()}`);
+
+  const body = await res.json() as any;
+  const prompt = body.choices?.[0]?.message?.content?.trim();
+  if (!prompt) throw new Error('LLM response did not include a prompt');
+  return prompt;
+}
+
+async function queueComfyWorkflow(config: {
+  comfyuiHost: string;
+  workflow: Workflow;
+  imagePrompt: string;
+  imageModel: string;
+}) {
+  const currentWorkflow = structuredClone(config.workflow);
+  currentWorkflow['6'].inputs.text = config.imagePrompt;
+  currentWorkflow['16'].inputs.unet_name = config.imageModel;
+
+  const res = await fetch(`${config.comfyuiHost}/prompt`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: currentWorkflow }),
+  });
+
+  if (!res.ok) throw new Error(`ComfyUI prompt failed: ${res.status} ${await res.text()}`);
+
+  const body = await res.json() as { prompt_id: string };
+  if (!body.prompt_id) throw new Error('ComfyUI response did not include a prompt_id');
+  return body.prompt_id;
+}
+
+function findFirstOutputImage(outputs: Record<string, any> | undefined): ComfyImage | null {
+  if (!outputs) return null;
+
+  for (const output of Object.values(outputs)) {
+    const image = output?.images?.[0];
+    if (image) return image;
+  }
+
+  return null;
+}
+
+async function waitForComfyImage(comfyuiHost: string, promptId: string): Promise<ComfyImage | null> {
+  for (let attempts = 0; attempts < COMFYUI_POLL_ATTEMPTS; attempts++) {
+    await Bun.sleep(COMFYUI_POLL_INTERVAL_MS);
+
+    const res = await fetch(`${comfyuiHost}/history/${promptId}`);
+    if (!res.ok) continue;
+
+    const history = await res.json() as Record<string, any>;
+    const outputImage = findFirstOutputImage(history[promptId]?.outputs);
+    if (outputImage) return outputImage;
+  }
+
+  return null;
+}
+
+async function fetchComfyImageAsWebp(comfyuiHost: string, image: ComfyImage): Promise<Buffer> {
+  const viewUrl = new URL('/view', comfyuiHost);
+  viewUrl.searchParams.set('filename', image.filename);
+  viewUrl.searchParams.set('subfolder', image.subfolder || '');
+  viewUrl.searchParams.set('type', image.type || 'output');
+
+  const res = await fetch(viewUrl.toString());
+  if (!res.ok) throw new Error(`Image fetch failed: ${res.status}`);
+
+  return sharp(await res.arrayBuffer())
+    .webp(WEBP_OPTIONS)
+    .toBuffer();
+}
+
+async function generateImage(config: {
+  index: number;
+  workflow: Workflow;
+  outputDir: string;
+  litellmHost: string;
+  comfyuiHost: string;
+  apiKey: string;
+}): Promise<GeneratedImage | null> {
+  const llmModel = pick(llmModels);
+  const imageModel = pick(imageModels);
+  const region = pick(regions);
+  const era = pick(eras);
+
+  console.log(`Generating image ${config.index}/${IMAGE_COUNT}...`);
+  console.log(`  LLM: ${llmModel} | Image: ${imageModel}`);
+  console.log(`  Setting: ${era} in ${region}`);
+
+  const imagePrompt = await requestImagePrompt({
+    litellmHost: config.litellmHost,
+    apiKey: config.apiKey,
+    llmModel,
+    era,
+    region,
+  });
+  console.log(`  Prompt: ${imagePrompt.slice(0, 80)}...`);
+
+  const promptId = await queueComfyWorkflow({
+    comfyuiHost: config.comfyuiHost,
+    workflow: config.workflow,
+    imagePrompt,
+    imageModel,
+  });
+
+  const outputImage = await waitForComfyImage(config.comfyuiHost, promptId);
+  if (!outputImage) {
+    console.error(`  ERROR: Timeout waiting for image ${config.index}`);
+    return null;
+  }
+
+  const imageData = await fetchComfyImageAsWebp(config.comfyuiHost, outputImage);
+  const hash = sha256Hex(imageData).slice(0, 12);
+  const filename = `image-${hash}.webp`;
+  const filepath = `${config.outputDir}/${filename}`;
+
+  await Bun.write(filepath, imageData);
+  console.log(`  Saved: ${filename}`);
+
+  return {
+    index: config.index,
+    filename,
+    prompt: imagePrompt,
+    filepath,
+    llm_model: llmModel,
+    image_model: imageModel,
+    region,
+    era,
+  };
+}
+
+function toManifest(results: GeneratedImage[]): ManifestEntry[] {
+  return results.map(({ filename, prompt, region, era, llm_model, image_model }) => ({
+    filename,
+    prompt,
+    region,
+    era,
+    llm_model,
+    image_model,
+  }));
+}
+
+async function uploadResults(results: GeneratedImage[]) {
+  const s3Endpoint = requireEnv('S3_ENDPOINT');
+  const s3Bucket = requireEnv('S3_BUCKET');
+
+  const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+  const s3 = new S3Client({
+    endpoint: s3Endpoint,
+    forcePathStyle: true,
+    region: 'us-east-1',
+  });
+
+  for (const result of results) {
+    const data = await Bun.file(result.filepath).arrayBuffer();
+    await s3.send(new PutObjectCommand({
+      Bucket: s3Bucket,
+      Key: `images/${result.filename}`,
+      Body: new Uint8Array(data),
+      ContentType: 'image/webp',
+      CacheControl: 'public, max-age=31536000, immutable',
+    }));
+    console.log(`  Uploaded: images/${result.filename}`);
+  }
+
+  await s3.send(new PutObjectCommand({
+    Bucket: s3Bucket,
+    Key: 'images/manifest.json',
+    Body: JSON.stringify(toManifest(results), null, 2),
+    ContentType: 'application/json',
+    CacheControl: 'public, max-age=60, must-revalidate',
+  }));
+  console.log('  Uploaded: images/manifest.json');
+}
+
+async function purgeCloudflareManifest() {
+  const cfZoneId = process.env.CF_ZONE_ID || '';
+  const cfApiToken = process.env.CF_API_TOKEN || '';
+
+  if (!cfZoneId || !cfApiToken) {
+    console.log('  CF purge skipped (CF_ZONE_ID/CF_API_TOKEN unset; relying on 60s TTL)');
+    return;
+  }
+
+  const res = await fetch(`https://api.cloudflare.com/client/v4/zones/${cfZoneId}/purge_cache`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${cfApiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ files: ['https://shdr.ch/images/manifest.json'] }),
+  });
+
+  if (!res.ok) throw new Error(`Cloudflare purge failed: ${res.status} ${await res.text()}`);
+  console.log('  Purged Cloudflare cache for manifest.json');
+}
+
+async function writeLocalManifest(outputDir: string, results: GeneratedImage[]) {
+  const metadataFile = `${outputDir}/manifest.json`;
+  await Bun.write(metadataFile, JSON.stringify(results, null, 2));
+  console.log(`  Metadata saved to: ${metadataFile}`);
+}
+
 async function main() {
+  const apiKey = requireEnv('LITELLM_API_KEY');
+  const litellmHost = trimTrailingSlashes(requireEnv('LITELLM_HOST'));
+  const comfyuiHost = trimTrailingSlashes(process.env.COMFYUI_HOST || 'https://comfyui.home.shdr.ch');
+  const upload = process.env.UPLOAD === 'true';
+  const outputDir = process.env.IMAGE_OUTPUT_DIR || './storage/images';
+
   await ensureDir(outputDir);
 
   const workflowPath = `${import.meta.dir}/../comfyui-workflow.json`;
-  const workflow = await Bun.file(workflowPath).json() as Record<string, any>;
+  const workflow = await Bun.file(workflowPath).json() as Workflow;
+  const results: GeneratedImage[] = [];
 
-  const results: Array<{
-    index: number;
-    filename: string;
-    prompt: string;
-    filepath: string;
-    llm_model: string;
-    image_model: string;
-    region: string;
-    era: string;
-  }>
-   = [];
-
-  for (let i = 1; i <= 20; i++) {
-    const llmModel = pick(llmModels);
-    const imageModel = pick(imageModels);
-    const region = pick(regions);
-    const era = pick(eras);
-
-    console.log(`Generating image ${i}/20...`);
-    console.log(`  LLM: ${llmModel} | Image: ${imageModel}`);
-    console.log(`  Setting: ${era} in ${region}`);
-
-    const promptInstruction = `Write a 3-4 sentence image prompt for a realistic historical photograph from ${era} in ${region}.\n\nDescribe it like a museum photo caption: plain language, no AI art buzzwords (no "8k", "cinematic", "masterpiece", etc).\n\nInclude:\n- The specific scene or moment\n- Exact location details\n- Time of day and lighting\n- If people are present: their appearance and what they're doing\n\nCRITICAL: All clothing, tools, architecture, and technology must be historically accurate for ${era}. No anachronisms - only materials, techniques, and objects that existed in that specific time and place.\n\nOutput ONLY the image prompt, nothing else.`;
-
-    const llmRes = await fetch(`${litellmHost.replace(/\/+$/, '')}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: llmModel,
-        messages: [{ role: 'user', content: promptInstruction }],
-      }),
+  for (let index = 1; index <= IMAGE_COUNT; index++) {
+    const result = await generateImage({
+      index,
+      workflow,
+      outputDir,
+      litellmHost,
+      comfyuiHost,
+      apiKey,
     });
-
-    if (!llmRes.ok) throw new Error(`LLM request failed: ${llmRes.status} ${await llmRes.text()}`);
-    const llmJson = await llmRes.json() as any;
-    const imagePrompt = llmJson.choices?.[0]?.message?.content?.trim() || '';
-
-    console.log(`  Prompt: ${imagePrompt.slice(0, 80)}...`);
-
-    const currentWorkflow = structuredClone(workflow);
-    currentWorkflow['6'].inputs.text = imagePrompt;
-    currentWorkflow['16'].inputs.unet_name = imageModel;
-
-    const promptRes = await fetch(`${comfyuiHost.replace(/\/+$/, '')}/prompt`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: currentWorkflow }),
-    });
-
-    if (!promptRes.ok) throw new Error(`ComfyUI prompt failed: ${promptRes.status} ${await promptRes.text()}`);
-    const promptData = await promptRes.json() as { prompt_id: string };
-    const promptId = promptData.prompt_id;
-
-    let outputImage: any = null;
-    const maxAttempts = 120;
-
-    for (let attempts = 0; attempts < maxAttempts; attempts++) {
-      await Bun.sleep(1000);
-      const historyRes = await fetch(`${comfyuiHost.replace(/\/+$/, '')}/history/${promptId}`);
-      if (!historyRes.ok) continue;
-      const historyData = await historyRes.json() as Record<string, any>;
-      const outputs = historyData[promptId]?.outputs;
-      if (outputs) {
-        for (const nodeId of Object.keys(outputs)) {
-          if (outputs[nodeId]?.images?.[0]) {
-            outputImage = outputs[nodeId].images[0];
-            break;
-          }
-        }
-      }
-      if (outputImage) break;
-    }
-
-    if (!outputImage) {
-      console.error(`  ERROR: Timeout waiting for image ${i}`);
-      continue;
-    }
-
-    const viewUrl = new URL('/view', comfyuiHost.replace(/\/+$/, ''));
-    viewUrl.searchParams.set('filename', outputImage.filename);
-    viewUrl.searchParams.set('subfolder', outputImage.subfolder || '');
-    viewUrl.searchParams.set('type', outputImage.type || 'output');
-
-    const imageRes = await fetch(viewUrl.toString());
-    if (!imageRes.ok) throw new Error(`Image fetch failed: ${imageRes.status}`);
-    const imageData = await sharp(await imageRes.arrayBuffer())
-      .webp({ quality: 82, effort: 4 })
-      .toBuffer();
-
-    const hash = sha256Hex(imageData).slice(0, 12);
-    const filename = `image-${hash}.webp`;
-    const filepath = `${outputDir}/${filename}`;
-
-    await Bun.write(filepath, imageData);
-
-    results.push({
-      index: i,
-      filename,
-      prompt: imagePrompt,
-      filepath,
-      llm_model: llmModel,
-      image_model: imageModel,
-      region,
-      era,
-    });
-
-    console.log(`  Saved: ${filename}`);
+    if (result) results.push(result);
   }
 
   if (upload) {
-    const s3Endpoint = requireEnv('S3_ENDPOINT');
-    const s3Bucket   = requireEnv('S3_BUCKET');
-    // CF purge is best-effort. When CF_* env is unset, manifest.json
-    // invalidates via its 60s Cache-Control TTL instead of an explicit purge.
-    const cfZoneId   = process.env.CF_ZONE_ID || '';
-    const cfApiToken = process.env.CF_API_TOKEN || '';
-
-    const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
-    const s3 = new S3Client({
-      endpoint: s3Endpoint,
-      forcePathStyle: true,
-      region: 'us-east-1',
-    });
-
-    for (const r of results) {
-      const data = await Bun.file(r.filepath).arrayBuffer();
-      await s3.send(new PutObjectCommand({
-        Bucket: s3Bucket,
-        Key: `images/${r.filename}`,
-        Body: new Uint8Array(data),
-        ContentType: 'image/webp',
-        CacheControl: 'public, max-age=31536000, immutable',
-      }));
-      console.log(`  Uploaded: images/${r.filename}`);
-    }
-
-    const manifest = results.map(r => ({
-      filename: r.filename,
-      prompt: r.prompt,
-      region: r.region,
-      era: r.era,
-      llm_model: r.llm_model,
-      image_model: r.image_model,
-    }));
-
-    const manifestBody = JSON.stringify(manifest, null, 2);
-    await s3.send(new PutObjectCommand({
-      Bucket: s3Bucket,
-      Key: 'images/manifest.json',
-      Body: manifestBody,
-      ContentType: 'application/json',
-      CacheControl: 'public, max-age=60, must-revalidate',
-    }));
-    console.log('  Uploaded: images/manifest.json');
-
-    if (cfZoneId && cfApiToken) {
-      const cfRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${cfZoneId}/purge_cache`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${cfApiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ files: ['https://shdr.ch/images/manifest.json'] }),
-      });
-      if (!cfRes.ok) throw new Error(`Cloudflare purge failed: ${cfRes.status} ${await cfRes.text()}`);
-      console.log('  Purged Cloudflare cache for manifest.json');
-    } else {
-      console.log('  CF purge skipped (CF_ZONE_ID/CF_API_TOKEN unset; relying on 60s TTL)');
-    }
+    await uploadResults(results);
+    await purgeCloudflareManifest();
   } else {
-    // local mode: write metadata.json
-    const metadataFile = `${outputDir}/manifest.json`;
-    await Bun.write(metadataFile, JSON.stringify(results, null, 2));
-    console.log(`  Metadata saved to: ${metadataFile}`);
+    await writeLocalManifest(outputDir, results);
   }
 
   console.log('\n=== Generation Complete ===');
