@@ -163,7 +163,7 @@ footer a:hover {
 /* Image credit panel */
 .image-credit {
   position: fixed;
-  width: min(300px, calc(100vw - 1.5rem));
+  width: min(320px, calc(100vw - 1.5rem));
   max-height: min(60vh, 420px);
   max-height: min(60dvh, 420px);
   padding: 0.875rem 1rem;
@@ -222,6 +222,13 @@ footer a:hover {
   min-width: 0;
 }
 
+.image-credit .meta > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .image-credit .meta .label {
   color: rgba(255, 255, 255, 0.2);
 }
@@ -240,13 +247,19 @@ footer a:hover {
 }
 
 .credit-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
+  position: relative;
+  min-height: 2rem;
+  padding-right: 6.75rem;
 }
 
 .credit-toggle {
-  flex: 0 0 auto;
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   min-width: 28px;
   height: 28px;
   padding: 0 0.625rem;

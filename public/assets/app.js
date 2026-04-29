@@ -113,6 +113,8 @@ makeDraggable(mainCard, "mainCardPos", getMainCardDefault());
 // Credit card - bottom right
 const creditCard = document.querySelector(".image-credit");
 const creditToggle = document.getElementById("creditToggle");
+const creditToggleText = document.getElementById("creditToggleText");
+const creditToggleIcon = document.getElementById("creditToggleIcon");
 const creditStorageKey = "creditCardPos";
 let collapsedCreditPos = null;
 if (creditCard) {
@@ -122,7 +124,8 @@ if (creditCard) {
 if (creditCard && creditToggle) {
   creditToggle.addEventListener("click", () => {
     const expanded = creditCard.classList.toggle("expanded");
-    creditToggle.textContent = expanded ? "hide prompt" : "see prompt";
+    creditToggleText.textContent = expanded ? "hide prompt" : "see prompt";
+    creditToggleIcon.textContent = expanded ? "-" : "+";
     creditToggle.setAttribute("aria-expanded", String(expanded));
     creditToggle.setAttribute("aria-label", expanded ? "Hide prompt" : "See prompt");
 
