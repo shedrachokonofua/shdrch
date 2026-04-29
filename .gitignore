@@ -25,4 +25,5 @@ Thumbs.db
 # Dev-generated images
 public/images/*
 !public/images/.gitkeep
+!public/images/manifest.json
 storage/images/

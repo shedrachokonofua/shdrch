@@ -66,6 +66,8 @@ deploy-site:
       export AWS_ENDPOINT_URL=https://s3.home.shdr.ch
   script:
     - aws s3 cp public/assets s3://shdrch/assets --recursive --cache-control "public,max-age=31536000,immutable"
+    - aws s3 cp public/images s3://shdrch/images --recursive --exclude "manifest.json" --cache-control "public,max-age=31536000,immutable"
+    - aws s3 cp public/images/manifest.json s3://shdrch/images/manifest.json --cache-control "public,max-age=60,must-revalidate" --content-type "application/json"
     - aws s3 cp public/index.html s3://shdrch/index.html --cache-control "public,max-age=60,must-revalidate" --content-type "text/html"
     - aws s3 cp public/robots.txt s3://shdrch/robots.txt --cache-control "public,max-age=86400" --content-type "text/plain"
     - aws s3 cp public/sitemap.xml s3://shdrch/sitemap.xml --cache-control "public,max-age=86400" --content-type "application/xml"
