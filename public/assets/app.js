@@ -164,6 +164,12 @@ const menuDropdown = document.getElementById("menuDropdown");
 const resetBtn = document.getElementById("resetBtn");
 const shuffleBtn = document.getElementById("shuffleBtn");
 
+function closeMenu() {
+  menuDropdown.classList.remove("show");
+  menuBtn.classList.remove("open");
+  menuBtn.setAttribute("aria-expanded", "false");
+}
+
 menuBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   const isOpen = menuDropdown.classList.toggle("show");
@@ -173,9 +179,7 @@ menuBtn.addEventListener("click", (e) => {
 
 // Close menu when clicking outside
 document.addEventListener("click", () => {
-  menuDropdown.classList.remove("show");
-  menuBtn.classList.remove("open");
-  menuBtn.setAttribute("aria-expanded", "false");
+  closeMenu();
 });
 
 menuDropdown.addEventListener("click", (e) => {
@@ -203,10 +207,7 @@ resetBtn.addEventListener("click", () => {
     setTimeout(() => (creditCard.style.transition = ""), 300);
   }
 
-  // Close menu
-  menuDropdown.classList.remove("show");
-  menuBtn.classList.remove("open");
-  menuBtn.setAttribute("aria-expanded", "false");
+  closeMenu();
 });
 
 // IP greeting
@@ -217,23 +218,56 @@ fetch('https://1.1.1.1/cdn-cgi/trace')
 
 // Random background + credit
 const siteAssetUrl = path => new URL(path, document.baseURI).toString();
+const bg = document.querySelector('.bg');
+const promptModelEl = document.getElementById('prompt-model');
+const imageModelEl = document.getElementById('image-model');
+const promptTextEl = document.getElementById('prompt-text');
+let imageManifest = [];
+let currentImageFilename = null;
+let backgroundLoadId = 0;
+
+function pickRandomImage() {
+  if (!imageManifest.length) return null;
+  const candidates = imageManifest.length > 1
+    ? imageManifest.filter(image => image.filename !== currentImageFilename)
+    : imageManifest;
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+function setBackground(pick) {
+  if (!pick || !bg) return;
+
+  const imageUrl = siteAssetUrl(`images/${pick.filename}`);
+  const preload = new Image();
+  const loadId = ++backgroundLoadId;
+
+  bg.classList.remove('loaded');
+  preload.decoding = 'async';
+  preload.onload = () => {
+    if (loadId !== backgroundLoadId) return;
+
+    currentImageFilename = pick.filename;
+    bg.style.setProperty('--bg-image', `url('${imageUrl}')`);
+    bg.classList.add('loaded');
+    promptModelEl.textContent = pick.llm_model.split('/').pop();
+    imageModelEl.textContent = pick.image_model.replace('.safetensors', '');
+    promptTextEl.textContent = pick.prompt;
+  };
+  preload.onerror = () => {
+    if (loadId === backgroundLoadId) bg.classList.add('loaded');
+  };
+  preload.src = imageUrl;
+}
+
+shuffleBtn.addEventListener("click", () => {
+  setBackground(pickRandomImage());
+  closeMenu();
+});
 
 fetch(siteAssetUrl('images/manifest.json'))
   .then(r => r.json())
   .then(manifest => {
-    if (!manifest.length) return;
-    const pick = manifest[Math.floor(Math.random() * manifest.length)];
-    const bg = document.querySelector('.bg');
-    const imageUrl = siteAssetUrl(`images/${pick.filename}`);
-    const preload = new Image();
-    preload.decoding = 'async';
-    preload.onload = () => {
-      bg.style.setProperty('--bg-image', `url('${imageUrl}')`);
-      bg.classList.add('loaded');
-    };
-    preload.src = imageUrl;
-    document.getElementById('prompt-model').textContent = pick.llm_model.split('/').pop();
-    document.getElementById('image-model').textContent = pick.image_model.replace('.safetensors', '');
-    document.getElementById('prompt-text').textContent = pick.prompt;
+    imageManifest = manifest;
+    setBackground(pickRandomImage());
   })
   .catch(() => { /* manifest not seeded yet — page renders without background */ });
