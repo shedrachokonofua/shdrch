@@ -168,13 +168,12 @@ footer {
   touch-action: none;
   overflow: hidden;
   transition:
-    width 0.2s ease,
     max-height 0.2s ease,
     background 0.2s ease;
 }
 
 .image-credit.expanded {
-  width: min(560px, calc(100vw - 1.5rem));
+  width: min(480px, calc(100vw - 1.5rem));
   background: rgba(0, 0, 0, 0.55);
   overflow: auto;
 }

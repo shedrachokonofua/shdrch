@@ -123,6 +123,10 @@ if (creditCard && creditToggle) {
     creditToggle.textContent = expanded ? "-" : "+";
     creditToggle.setAttribute("aria-expanded", String(expanded));
     creditToggle.setAttribute("aria-label", expanded ? "Collapse prompt" : "Expand prompt");
+    creditCard.style.left = Math.min(
+      creditCard.offsetLeft,
+      Math.max(0, window.innerWidth - creditCard.getBoundingClientRect().width)
+    ) + "px";
     requestAnimationFrame(() => clampToViewport(creditCard));
   });
 }
