@@ -1,17 +1,86 @@
-function makeDraggable(el, storageKey, defaultPos) {
+function readStoredPosition(storageKey) {
+  try {
+    return JSON.parse(localStorage.getItem(storageKey));
+  } catch {
+    return null;
+  }
+}
+
+function getViewportPadding(options) {
+  if (typeof options.padding === "function") return options.padding();
+  return options.padding ?? 0;
+}
+
+function getStoredPosition(el, edgeAnchored = false) {
+  const rect = el.getBoundingClientRect();
+  const x = el.offsetLeft;
+  const y = el.offsetTop;
+
+  if (!edgeAnchored) return { x, y };
+
+  const horizontalEdge = x + rect.width / 2 > window.innerWidth / 2 ? "right" : "left";
+  const verticalEdge = y + rect.height / 2 > window.innerHeight / 2 ? "bottom" : "top";
+
+  return {
+    x,
+    y,
+    horizontalEdge,
+    horizontalOffset: horizontalEdge === "right" ? window.innerWidth - x - rect.width : x,
+    verticalEdge,
+    verticalOffset: verticalEdge === "bottom" ? window.innerHeight - y - rect.height : y,
+  };
+}
+
+function saveStoredPosition(el, storageKey, edgeAnchored = false) {
+  const position = getStoredPosition(el, edgeAnchored);
+  localStorage.setItem(storageKey, JSON.stringify(position));
+  return position;
+}
+
+function applyPosition(el, position, edgeAnchored = false) {
+  if (!position) return;
+
+  const rect = el.getBoundingClientRect();
+  if (
+    edgeAnchored &&
+    position.horizontalEdge &&
+    position.verticalEdge &&
+    Number.isFinite(position.horizontalOffset) &&
+    Number.isFinite(position.verticalOffset)
+  ) {
+    el.style.left = (
+      position.horizontalEdge === "right"
+        ? window.innerWidth - rect.width - position.horizontalOffset
+        : position.horizontalOffset
+    ) + "px";
+    el.style.top = (
+      position.verticalEdge === "bottom"
+        ? window.innerHeight - rect.height - position.verticalOffset
+        : position.verticalOffset
+    ) + "px";
+    return;
+  }
+
+  if (Number.isFinite(position.x)) el.style.left = position.x + "px";
+  if (Number.isFinite(position.y)) el.style.top = position.y + "px";
+}
+
+function makeDraggable(el, storageKey, defaultPos, options = {}) {
   let isDragging = false;
   let startX, startY, initialX, initialY;
+  let storedPosition = readStoredPosition(storageKey);
 
   // Load saved position or use default
-  const saved = localStorage.getItem(storageKey);
-  if (saved) {
-    const { x, y } = JSON.parse(saved);
-    el.style.left = x + "px";
-    el.style.top = y + "px";
+  if (storedPosition) {
+    applyPosition(el, storedPosition, options.edgeAnchored);
   } else {
     el.style.left = defaultPos.left;
     el.style.top = defaultPos.top;
   }
+  requestAnimationFrame(() => {
+    clampToViewport(el, getViewportPadding(options));
+    if (options.edgeAnchored) storedPosition = saveStoredPosition(el, storageKey, true);
+  });
 
   function onStart(e) {
     if (e.target.closest("a, button")) return;
@@ -41,11 +110,12 @@ function makeDraggable(el, storageKey, defaultPos) {
     let newY = initialY + dy;
 
     const rect = el.getBoundingClientRect();
-    const maxX = window.innerWidth - rect.width;
-    const maxY = window.innerHeight - rect.height;
+    const padding = getViewportPadding(options);
+    const maxX = window.innerWidth - rect.width - padding;
+    const maxY = window.innerHeight - rect.height - padding;
 
-    newX = Math.max(0, Math.min(newX, maxX));
-    newY = Math.max(0, Math.min(newY, maxY));
+    newX = Math.max(padding, Math.min(newX, maxX));
+    newY = Math.max(padding, Math.min(newY, maxY));
 
     el.style.left = newX + "px";
     el.style.top = newY + "px";
@@ -56,13 +126,7 @@ function makeDraggable(el, storageKey, defaultPos) {
     isDragging = false;
     el.classList.remove("dragging");
 
-    localStorage.setItem(
-      storageKey,
-      JSON.stringify({
-        x: el.offsetLeft,
-        y: el.offsetTop,
-      })
-    );
+    storedPosition = saveStoredPosition(el, storageKey, options.edgeAnchored);
   }
 
   el.addEventListener("mousedown", onStart);
@@ -73,23 +137,26 @@ function makeDraggable(el, storageKey, defaultPos) {
   document.addEventListener("touchend", onEnd);
 
   window.addEventListener("resize", () => {
-    clampToViewport(el);
+    storedPosition = readStoredPosition(storageKey) || storedPosition;
+    if (options.edgeAnchored) applyPosition(el, storedPosition, true);
+    clampToViewport(el, getViewportPadding(options));
   });
 }
 
-function clampToViewport(el) {
+function clampToViewport(el, padding = 0) {
     const rect = el.getBoundingClientRect();
-    const maxX = window.innerWidth - rect.width;
-    const maxY = window.innerHeight - rect.height;
+    const maxX = window.innerWidth - rect.width - padding;
+    const maxY = window.innerHeight - rect.height - padding;
 
-    if (el.offsetLeft > maxX) el.style.left = Math.max(0, maxX) + "px";
-    if (el.offsetTop > maxY) el.style.top = Math.max(0, maxY) + "px";
-    if (el.offsetLeft < 0) el.style.left = "0px";
-    if (el.offsetTop < 0) el.style.top = "0px";
+    if (el.offsetLeft > maxX) el.style.left = Math.max(padding, maxX) + "px";
+    if (el.offsetTop > maxY) el.style.top = Math.max(padding, maxY) + "px";
+    if (el.offsetLeft < padding) el.style.left = padding + "px";
+    if (el.offsetTop < padding) el.style.top = padding + "px";
 }
 
 // Responsive default positions
 const isMobile = () => window.innerWidth < 640;
+const getEdgePadding = () => isMobile() ? 12 : 24;
 const getMainCardDefault = () => {
   const padding = isMobile() ? "1rem" : "2rem";
   return { left: padding, top: padding };
@@ -99,7 +166,7 @@ const getCreditCardDefault = () => {
   const el = document.querySelector(".image-credit");
   if (!el) return null;
   const rect = el.getBoundingClientRect();
-  const padding = isMobile() ? 12 : 24;
+  const padding = getEdgePadding();
   return {
     left: Math.max(padding, window.innerWidth - rect.width - padding) + "px",
     top: Math.max(padding, window.innerHeight - rect.height - padding) + "px",
@@ -118,7 +185,10 @@ const creditToggleIcon = document.getElementById("creditToggleIcon");
 const creditStorageKey = "creditCardPos";
 let collapsedCreditPos = null;
 if (creditCard) {
-  makeDraggable(creditCard, creditStorageKey, getCreditCardDefault());
+  makeDraggable(creditCard, creditStorageKey, getCreditCardDefault(), {
+    edgeAnchored: true,
+    padding: getEdgePadding,
+  });
 }
 
 if (creditCard && creditToggle) {
@@ -130,29 +200,16 @@ if (creditCard && creditToggle) {
     creditToggle.setAttribute("aria-label", expanded ? "Hide prompt" : "See prompt");
 
     if (expanded) {
-      collapsedCreditPos = {
-        left: creditCard.style.left,
-        top: creditCard.style.top,
-      };
-      creditCard.style.left = Math.min(
-        creditCard.offsetLeft,
-        Math.max(0, window.innerWidth - creditCard.getBoundingClientRect().width)
-      ) + "px";
+      collapsedCreditPos = getStoredPosition(creditCard, true);
+      applyPosition(creditCard, collapsedCreditPos, true);
     } else if (collapsedCreditPos) {
-      creditCard.style.left = collapsedCreditPos.left;
-      creditCard.style.top = collapsedCreditPos.top;
+      applyPosition(creditCard, collapsedCreditPos, true);
     }
 
     requestAnimationFrame(() => {
-      clampToViewport(creditCard);
+      clampToViewport(creditCard, getEdgePadding());
       if (!expanded) {
-        localStorage.setItem(
-          creditStorageKey,
-          JSON.stringify({
-            x: creditCard.offsetLeft,
-            y: creditCard.offsetTop,
-          })
-        );
+        saveStoredPosition(creditCard, creditStorageKey, true);
       }
     });
   });
@@ -204,6 +261,7 @@ resetBtn.addEventListener("click", () => {
     creditCard.style.transition = "left 0.3s ease, top 0.3s ease";
     creditCard.style.left = creditDefault.left;
     creditCard.style.top = creditDefault.top;
+    saveStoredPosition(creditCard, creditStorageKey, true);
     setTimeout(() => (creditCard.style.transition = ""), 300);
   }
 
