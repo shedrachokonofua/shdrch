@@ -25,7 +25,7 @@ ENV_FILE="${AETHER_CACHE_DIR}/aether-admin-env"
 
 # Reuse cached STS creds if they have more than 5 minutes left.
 if [[ -f "$ENV_FILE" ]]; then
-  if mtime=$(stat -f %m "$ENV_FILE" 2>/dev/null || stat -c %Y "$ENV_FILE" 2>/dev/null); then
+  if mtime=$(stat -c %Y "$ENV_FILE" 2>/dev/null || stat -f %m "$ENV_FILE" 2>/dev/null); then
     # STS token TTL is 1h by default. Treat anything < 50 min old as still valid.
     if (( $(date +%s) - mtime < 3000 )); then
       echo "[login] STS env still fresh at $ENV_FILE"
