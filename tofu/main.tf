@@ -221,7 +221,9 @@ resource "kubernetes_cron_job_v1" "image_generator" {
           metadata {
             labels = {
               "app.kubernetes.io/name" = "shdrch-image-generator"
-              "aether.sh/arm-ok"       = "true"
+              # No aether.sh/arm-ok label: image is amd64-only (Bun + buildah
+              # cross-arch limitation). Kyverno gate steers the pod to amd64
+              # workers, which is correct.
             }
           }
           spec {
