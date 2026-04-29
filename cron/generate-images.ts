@@ -6,7 +6,7 @@ const upload       = process.env.UPLOAD === 'true';
 const outputDir = process.env.IMAGE_OUTPUT_DIR || './storage/images';
 
 const llmModels = [
-  'aether/qwen3:8b',
+  'aether/qwen3.5-9b',
 ];
 
 const imageModels = [

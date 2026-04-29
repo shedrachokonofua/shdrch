@@ -230,6 +230,7 @@ resource "kubernetes_cron_job_v1" "image_generator" {
             service_account_name            = kubernetes_service_account_v1.image_generator.metadata[0].name
             automount_service_account_token = false
             restart_policy                  = "OnFailure"
+            node_selector                   = { "kubernetes.io/arch" = "amd64" }
 
             security_context {
               run_as_non_root = true
@@ -255,6 +256,7 @@ resource "kubernetes_cron_job_v1" "image_generator" {
               security_context {
                 allow_privilege_escalation = false
                 read_only_root_filesystem  = true
+                run_as_non_root            = true
                 capabilities { drop = ["ALL"] }
               }
 
