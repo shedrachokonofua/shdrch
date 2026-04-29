@@ -92,19 +92,21 @@ function sha256Hex(data: Uint8Array): string {
 }
 
 function buildImagePromptInstruction(era: string, region: string): string {
-  return `Write a 3-4 sentence image prompt for a realistic historical photograph from ${era} in ${region}.
+  return `Write exactly 3 sentences for an image prompt describing a realistic color historical photograph from ${era} in ${region}.
 
-Describe it like a museum photo caption: plain language, no AI art buzzwords (no "8k", "cinematic", "masterpiece", etc).
+Describe it like a museum photo caption: plain language, natural color, believable daylight or lamplight, no AI art buzzwords (no "8k", "cinematic", "masterpiece", etc).
 
 Include:
 - The specific scene or moment
 - Exact location details
 - Time of day and lighting
 - If people are present: their appearance and what they're doing
+- One concrete visual detail that showcases what is distinctive about that era and place
 
 CRITICAL: All clothing, tools, architecture, and technology must be historically accurate for ${era}. No anachronisms - only materials, techniques, and objects that existed in that specific time and place.
+CRITICAL: Do not mention black-and-white, monochrome, grayscale, sepia, archival tinting, hand-coloring, faded film, or any lack of color.
 
-Output ONLY the image prompt, nothing else.`;
+Output ONLY the 3-sentence image prompt, nothing else.`;
 }
 
 async function ensureDir(dir: string) {
