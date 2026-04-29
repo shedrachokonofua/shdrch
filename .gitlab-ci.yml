@@ -75,9 +75,13 @@ deploy-site:
     # to enable instant purges.
     - |
       if [ -n "$CF_ZONE_ID" ] && [ -n "$CF_API_TOKEN" ]; then
-        curl -sf -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+        if curl -sf -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
           -H "Authorization: Bearer ${CF_API_TOKEN}" -H "Content-Type: application/json" \
-          --data '{"files":["https://shdr.ch/index.html","https://shdr.ch/"]}'
+          --data '{"files":["https://shdr.ch/index.html","https://shdr.ch/"]}'; then
+          echo "CF purge completed"
+        else
+          echo "CF purge failed; continuing because uploaded objects use short Cache-Control TTL"
+        fi
       else
         echo "CF purge skipped (CF_ZONE_ID/CF_API_TOKEN CI vars unset)"
       fi
