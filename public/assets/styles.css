@@ -148,6 +148,18 @@ footer {
   color: rgba(255, 255, 255, 0.4);
 }
 
+footer a,
+footer a:visited {
+  color: rgba(52, 211, 153, 0.72);
+  text-decoration-color: rgba(52, 211, 153, 0.35);
+  text-underline-offset: 2px;
+}
+
+footer a:hover {
+  color: #34d399;
+  text-decoration-color: rgba(52, 211, 153, 0.75);
+}
+
 /* Image credit panel */
 .image-credit {
   position: fixed;
@@ -235,16 +247,18 @@ footer {
 
 .credit-toggle {
   flex: 0 0 auto;
-  width: 28px;
+  min-width: 28px;
   height: 28px;
+  padding: 0 0.625rem;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 50%;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.78);
   cursor: pointer;
   font-family: inherit;
-  font-size: 16px;
+  font-size: 10px;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .credit-toggle:hover {

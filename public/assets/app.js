@@ -113,21 +113,45 @@ makeDraggable(mainCard, "mainCardPos", getMainCardDefault());
 // Credit card - bottom right
 const creditCard = document.querySelector(".image-credit");
 const creditToggle = document.getElementById("creditToggle");
+const creditStorageKey = "creditCardPos";
+let collapsedCreditPos = null;
 if (creditCard) {
-  makeDraggable(creditCard, "creditCardPos", getCreditCardDefault());
+  makeDraggable(creditCard, creditStorageKey, getCreditCardDefault());
 }
 
 if (creditCard && creditToggle) {
   creditToggle.addEventListener("click", () => {
     const expanded = creditCard.classList.toggle("expanded");
-    creditToggle.textContent = expanded ? "-" : "+";
+    creditToggle.textContent = expanded ? "hide prompt" : "see prompt";
     creditToggle.setAttribute("aria-expanded", String(expanded));
-    creditToggle.setAttribute("aria-label", expanded ? "Collapse prompt" : "Expand prompt");
-    creditCard.style.left = Math.min(
-      creditCard.offsetLeft,
-      Math.max(0, window.innerWidth - creditCard.getBoundingClientRect().width)
-    ) + "px";
-    requestAnimationFrame(() => clampToViewport(creditCard));
+    creditToggle.setAttribute("aria-label", expanded ? "Hide prompt" : "See prompt");
+
+    if (expanded) {
+      collapsedCreditPos = {
+        left: creditCard.style.left,
+        top: creditCard.style.top,
+      };
+      creditCard.style.left = Math.min(
+        creditCard.offsetLeft,
+        Math.max(0, window.innerWidth - creditCard.getBoundingClientRect().width)
+      ) + "px";
+    } else if (collapsedCreditPos) {
+      creditCard.style.left = collapsedCreditPos.left;
+      creditCard.style.top = collapsedCreditPos.top;
+    }
+
+    requestAnimationFrame(() => {
+      clampToViewport(creditCard);
+      if (!expanded) {
+        localStorage.setItem(
+          creditStorageKey,
+          JSON.stringify({
+            x: creditCard.offsetLeft,
+            y: creditCard.offsetTop,
+          })
+        );
+      }
+    });
   });
 }
 
