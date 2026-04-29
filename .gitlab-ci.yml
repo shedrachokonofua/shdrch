@@ -6,7 +6,7 @@ variables:
   BUILDAH_FORMAT: "docker"
   # Public — not a secret, just a stable identifier. Created by tofu apply
   # locally before this CI runs (otherwise STS assume-role 404s).
-  RGW_DEPLOY_ROLE_ARN: "arn:aws:iam::RGW54357707893720224:role/shdrch-deploy"
+  RGW_DEPLOY_ROLE_ARN: "arn:aws:iam::RGW65051373228719292:role/shdrch-deploy"
 
 workflow:
   rules:
