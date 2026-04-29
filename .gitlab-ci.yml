@@ -1,56 +1,79 @@
-stages:
-  - secret-detection
-  - infra
-  - deploy
+stages: [secret-detection, build, deploy-site]
 
 variables:
-  TF_ROOT: ${CI_PROJECT_DIR}/tofu
-  TF_STATE_NAME: shdrch
-  DOKKU_APP: shdrch
+  IMAGE: "$CI_REGISTRY_IMAGE"
+  STORAGE_DRIVER: "vfs"
+  BUILDAH_FORMAT: "docker"
+  # Public — not a secret, just a stable identifier. Created by tofu apply
+  # locally before this CI runs (otherwise STS assume-role 404s).
+  RGW_DEPLOY_ROLE_ARN: "arn:aws:iam::RGW54357707893720224:role/shdrch-deploy"
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
 
 include:
   - template: Security/Secret-Detection.gitlab-ci.yml
-  - project: "aether/ci-templates"
-    ref: main
-    file:
-      - "/dokku/tofu.yml"
-      - "/dokku/deploy.yml"
 
 secret_detection:
   stage: secret-detection
 
-infra:
-  extends:
-    - .tofu_variables
-    - .tofu_job
-  stage: infra
-  id_tokens:
-    INFISICAL_AUTH_JWT:
-      aud: https://infisical.home.shdr.ch
-  script:
-    - cd ${TF_ROOT}
-    - tofu init
-    - tofu apply -auto-approve
-  only:
-    - main
+.image-build:
+  image: quay.io/buildah/stable:latest
+  tags: [buildah]
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
 
-deploy:
-  extends: .dokku_deploy
-  stage: deploy
-  only:
-    - main
-
-purge_cf_cache:
-  stage: deploy
-  needs: [deploy]
-  image: curlimages/curl:latest
+build:image:
+  stage: build
+  extends: .image-build
   script:
+    - TAG="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
     - |
-      response=$(curl -sf -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
-        -H "Authorization: Bearer ${CF_API_TOKEN}" \
-        -H "Content-Type: application/json" \
-        --data '{"purge_everything":true}')
-      echo "$response"
-      echo "$response" | grep -q '"success": true'
-  only:
-    - main
+      buildah manifest create "$IMAGE:$TAG"
+      buildah build --jobs=2 --platform=linux/amd64,linux/arm64 \
+        --manifest "$IMAGE:$TAG" -f Dockerfile .
+      buildah manifest push --all "$IMAGE:$TAG" "docker://$IMAGE:$TAG"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        buildah manifest push --all "$IMAGE:$TAG" "docker://$IMAGE:latest"
+      fi
+
+deploy-site:
+  stage: deploy-site
+  image: alpine:3.20
+  needs: []
+  id_tokens:
+    RGW_STS_TOKEN:
+      aud: https://gitlab.home.shdr.ch
+  before_script:
+    - apk add --no-cache aws-cli jq curl s5cmd
+    - |
+      creds=$(aws sts assume-role-with-web-identity \
+        --endpoint-url https://s3.home.shdr.ch \
+        --role-arn "$RGW_DEPLOY_ROLE_ARN" \
+        --role-session-name "ci-${CI_JOB_ID}" \
+        --web-identity-token "$RGW_STS_TOKEN" --output json)
+      export AWS_ACCESS_KEY_ID=$(echo "$creds" | jq -r '.Credentials.AccessKeyId')
+      export AWS_SECRET_ACCESS_KEY=$(echo "$creds" | jq -r '.Credentials.SecretAccessKey')
+      export AWS_SESSION_TOKEN=$(echo "$creds" | jq -r '.Credentials.SessionToken')
+  script:
+    - s5cmd --endpoint-url https://s3.home.shdr.ch sync --delete --cache-control "public,max-age=31536000,immutable" 'public/assets/*' s3://shdrch/assets/
+    - s5cmd --endpoint-url https://s3.home.shdr.ch sync --cache-control "public,max-age=60,must-revalidate" 'public/*.html' s3://shdrch/
+    - s5cmd --endpoint-url https://s3.home.shdr.ch sync --cache-control "public,max-age=86400" 'public/robots.txt' 'public/sitemap.xml' s3://shdrch/
+    # Cloudflare cache purge is best-effort. When CF_ZONE_ID/CF_API_TOKEN
+    # CI variables are unset, the edge picks up changes via index.html's
+    # 60s Cache-Control TTL. Define both vars in Settings → CI/CD → Variables
+    # to enable instant purges.
+    - |
+      if [ -n "$CF_ZONE_ID" ] && [ -n "$CF_API_TOKEN" ]; then
+        curl -sf -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+          -H "Authorization: Bearer ${CF_API_TOKEN}" -H "Content-Type: application/json" \
+          --data '{"files":["https://shdr.ch/index.html","https://shdr.ch/"]}'
+      else
+        echo "CF purge skipped (CF_ZONE_ID/CF_API_TOKEN CI vars unset)"
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

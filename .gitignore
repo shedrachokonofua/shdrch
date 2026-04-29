@@ -8,8 +8,8 @@
 backend.conf
 !backend.conf.example
 
-# PHP / Composer
-/vendor/
+# Bun / Node
+node_modules/
 
 # IDE
 .idea/
@@ -22,4 +22,7 @@ backend.conf
 .DS_Store
 Thumbs.db
 
+# Dev-generated images
+public/images/*
+!public/images/.gitkeep
 storage/images/

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>shdrch</title>
+  <meta name="description" content="Shedrach's home page.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://shdr.ch">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://shdr.ch">
+  <meta property="og:title" content="shdrch">
+  <meta property="og:description" content="Shedrach's home page.">
+  <meta property="og:site_name" content="shdrch">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:url" content="https://shdr.ch">
+  <meta name="twitter:title" content="shdrch">
+  <meta name="twitter:description" content="Shedrach's home page.">
+
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": "shdrch",
+    "url": "https://shdr.ch",
+    "sameAs": [
+      "https://github.com/shedrachokonofua",
+      "https://linkedin.com/in/shdrch"
+    ],
+    "email": "s@shdr.ch",
+    "jobTitle": "Software Engineer"
+  }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+
+<body>
+  <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+    <symbol id="icon-menu" viewBox="0 0 24 24">
+      <circle cx="12" cy="6" r="2"/>
+      <circle cx="12" cy="12" r="2"/>
+      <circle cx="12" cy="18" r="2"/>
+    </symbol>
+    <symbol id="icon-reset" viewBox="0 0 24 24">
+      <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+    </symbol>
+    <symbol id="icon-shuffle" viewBox="0 0 24 24">
+      <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+    </symbol>
+  </svg>
+
+  <div class="bg" style="--bg-image: var(--bg-image, none)"></div>
+  <div class="overlay"></div>
+
+  <!-- Menu button -->
+  <button class="menu-btn" id="menuBtn" aria-label="Menu" aria-expanded="false">
+    <svg>
+      <use href="#icon-menu" />
+    </svg>
+  </button>
+
+  <div class="menu-dropdown" id="menuDropdown">
+    <button id="resetBtn">
+      <svg>
+        <use href="#icon-reset" />
+      </svg>
+      reset positions
+    </button>
+    <button id="shuffleBtn">
+      <svg>
+        <use href="#icon-shuffle" />
+      </svg>
+      shuffle background
+    </button>
+  </div>
+
+  <main class="container" itemscope itemtype="https://schema.org/Person">
+    <h1 class="greeting">$ hello, <span id="ip"></span></h1>
+    <meta itemprop="name" content="shdrch">
+    <nav aria-label="Social links">
+      <ul>
+        <li>
+          <a class="link" href="https://github.com/shedrachokonofua" rel="me noopener" target="_blank" itemprop="sameAs"
+            aria-label="GitHub profile">
+            github
+          </a>
+        </li>
+        <li>
+          <a href="https://linkedin.com/in/shdrch" rel="me noopener" target="_blank" itemprop="sameAs"
+            aria-label="LinkedIn profile">
+            linkedin
+          </a>
+        </li>
+        <li>
+          <a href="mailto:s@shdr.ch" itemprop="email" aria-label="Send email">
+            email
+          </a>
+        </li>
+      </ul>
+    </nav>
+    <footer>served by <a href="https://github.com/shedrachokonofua/aether" target="_blank" rel="noopener">aether</a>
+    </footer>
+  </main>
+
+  <aside class="image-credit" title="This background was AI-generated">
+    <div class="meta">
+      <span><span class="label">prompt model:</span> <span id="prompt-model"></span></span>
+      <span><span class="label">image model:</span> <span id="image-model"></span></span>
+    </div>
+    <p class="prompt" id="prompt-text"></p>
+  </aside>
+
+  <script src="/assets/app.js"></script>
+</body>
+
+</html>

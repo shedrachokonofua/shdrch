@@ -1,0 +1,11 @@
+{
+  "name": "shdrch",
+  "module": "cron/generate-images.ts",
+  "type": "module",
+  "scripts": {
+    "generate-images": "bun run cron/generate-images.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.0.0"
+  }
+}
