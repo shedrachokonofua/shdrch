@@ -170,14 +170,15 @@ fetch('https://1.1.1.1/cdn-cgi/trace')
   .catch(() => { document.getElementById('ip').textContent = 'visitor'; });
 
 // Random background + credit
-fetch('images/manifest.json')
+const siteAssetUrl = path => new URL(path, document.baseURI).toString();
+
+fetch(siteAssetUrl('images/manifest.json'))
   .then(r => r.json())
   .then(manifest => {
     const pick = manifest[Math.floor(Math.random() * manifest.length)];
-    document.querySelector('.bg').style.setProperty('--bg-image', `url('images/${pick.filename}')`);
+    document.querySelector('.bg').style.setProperty('--bg-image', `url('${siteAssetUrl(`images/${pick.filename}`)}')`);
     document.getElementById('prompt-model').textContent = pick.llm_model.split('/').pop();
     document.getElementById('image-model').textContent = pick.image_model.replace('.safetensors', '');
     document.getElementById('prompt-text').textContent = pick.prompt;
   })
   .catch(() => { /* manifest not seeded yet — page renders without background */ });
-

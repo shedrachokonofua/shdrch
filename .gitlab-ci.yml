@@ -65,7 +65,7 @@ deploy-site:
       export AWS_REGION=us-east-1
       export AWS_ENDPOINT_URL=https://s3.home.shdr.ch
   script:
-    - aws s3 cp public/assets s3://shdrch/assets --recursive --cache-control "public,max-age=31536000,immutable"
+    - aws s3 cp public/assets s3://shdrch/assets --recursive --cache-control "public,max-age=60,must-revalidate"
     - aws s3 cp public/index.html s3://shdrch/index.html --cache-control "public,max-age=60,must-revalidate" --content-type "text/html"
     - aws s3 cp public/robots.txt s3://shdrch/robots.txt --cache-control "public,max-age=86400" --content-type "text/plain"
     - aws s3 cp public/sitemap.xml s3://shdrch/sitemap.xml --cache-control "public,max-age=86400" --content-type "application/xml"
@@ -78,7 +78,7 @@ deploy-site:
         cf_body=$(mktemp)
         cf_code=$(curl -sS -o "$cf_body" -w "%{http_code}" -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
           -H "Authorization: Bearer ${CF_API_TOKEN}" -H "Content-Type: application/json" \
-          --data '{"files":["https://shdr.ch/index.html","https://shdr.ch/"]}' || true)
+          --data '{"files":["https://shdr.ch/index.html","https://shdr.ch/","https://shdr.ch/assets/styles.css","https://shdr.ch/assets/app.js"]}' || true)
         if [ "$cf_code" = "200" ] && jq -e '.success == true' "$cf_body" >/dev/null 2>&1; then
           echo "CF purge completed"
         else
