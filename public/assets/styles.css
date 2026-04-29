@@ -11,6 +11,8 @@ body {
 
 body {
   font-family: "JetBrains Mono", monospace;
+  height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -24,6 +26,7 @@ body {
   padding-left: max(env(safe-area-inset-left), clamp(1rem, 4vw, 2rem));
   padding-right: max(env(safe-area-inset-right), clamp(1rem, 4vw, 2rem));
   position: relative;
+  overflow: hidden;
   overflow-x: hidden;
 }
 
@@ -31,8 +34,17 @@ body {
 .bg {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   z-index: -2;
   background: var(--bg-image, #0a0a0a) center/cover no-repeat;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.bg.loaded {
+  opacity: 1;
 }
 
 /* Overlay for readability */
@@ -50,7 +62,7 @@ body {
 }
 
 .container {
-  position: absolute;
+  position: fixed;
   max-width: 420px;
   width: calc(100% - clamp(2rem, 8vw, 4rem));
   padding: clamp(1.5rem, 5vw, 2.5rem);
@@ -138,9 +150,11 @@ footer {
 
 /* Image credit panel */
 .image-credit {
-  position: absolute;
-  max-width: min(320px, calc(100vw - 2rem));
-  padding: clamp(0.75rem, 2.5vw, 1rem) clamp(1rem, 3vw, 1.25rem);
+  position: fixed;
+  width: min(300px, calc(100vw - 1.5rem));
+  max-height: min(60vh, 420px);
+  max-height: min(60dvh, 420px);
+  padding: 0.875rem 1rem;
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -152,6 +166,17 @@ footer {
   cursor: grab;
   user-select: none;
   touch-action: none;
+  overflow: hidden;
+  transition:
+    width 0.2s ease,
+    max-height 0.2s ease,
+    background 0.2s ease;
+}
+
+.image-credit.expanded {
+  width: min(560px, calc(100vw - 1.5rem));
+  background: rgba(0, 0, 0, 0.55);
+  overflow: auto;
 }
 
 .image-credit:active {
@@ -179,11 +204,11 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  margin-bottom: 0.75rem;
   font-size: 10px;
   color: rgba(255, 255, 255, 0.45);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  min-width: 0;
 }
 
 .image-credit .meta .label {
@@ -192,6 +217,40 @@ footer {
 
 .image-credit .prompt {
   color: rgba(255, 255, 255, 0.55);
+  display: none;
+  margin-top: 0.75rem;
+  max-height: min(42vh, 280px);
+  max-height: min(42dvh, 280px);
+  overflow: auto;
+}
+
+.image-credit.expanded .prompt {
+  display: block;
+}
+
+.credit-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.credit-toggle {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.credit-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 /* Menu button */
@@ -305,7 +364,7 @@ footer {
   }
 
   .image-credit {
-    max-width: calc(100vw - 1rem);
+    width: calc(100vw - 1rem);
   }
 
   .greeting {

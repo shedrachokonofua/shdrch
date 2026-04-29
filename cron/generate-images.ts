@@ -66,6 +66,7 @@ function sha256Hex(data: Uint8Array): string {
 }
 
 import { mkdir } from 'node:fs/promises';
+import sharp from 'sharp';
 
 async function ensureDir(dir: string) {
   await mkdir(dir, { recursive: true });
@@ -162,10 +163,12 @@ async function main() {
 
     const imageRes = await fetch(viewUrl.toString());
     if (!imageRes.ok) throw new Error(`Image fetch failed: ${imageRes.status}`);
-    const imageData = new Uint8Array(await imageRes.arrayBuffer());
+    const imageData = await sharp(await imageRes.arrayBuffer())
+      .webp({ quality: 82, effort: 4 })
+      .toBuffer();
 
     const hash = sha256Hex(imageData).slice(0, 12);
-    const filename = `image-${hash}.png`;
+    const filename = `image-${hash}.webp`;
     const filepath = `${outputDir}/${filename}`;
 
     await Bun.write(filepath, imageData);
@@ -205,7 +208,7 @@ async function main() {
         Bucket: s3Bucket,
         Key: `images/${r.filename}`,
         Body: new Uint8Array(data),
-        ContentType: 'image/png',
+        ContentType: 'image/webp',
         CacheControl: 'public, max-age=31536000, immutable',
       }));
       console.log(`  Uploaded: images/${r.filename}`);

@@ -11,12 +11,10 @@ function makeDraggable(el, storageKey, defaultPos) {
   } else {
     el.style.left = defaultPos.left;
     el.style.top = defaultPos.top;
-    if (defaultPos.right) el.style.right = defaultPos.right;
-    if (defaultPos.bottom) el.style.bottom = defaultPos.bottom;
   }
 
   function onStart(e) {
-    if (e.target.tagName === "A") return;
+    if (e.target.closest("a, button")) return;
     isDragging = true;
     el.classList.add("dragging");
 
@@ -75,13 +73,19 @@ function makeDraggable(el, storageKey, defaultPos) {
   document.addEventListener("touchend", onEnd);
 
   window.addEventListener("resize", () => {
+    clampToViewport(el);
+  });
+}
+
+function clampToViewport(el) {
     const rect = el.getBoundingClientRect();
     const maxX = window.innerWidth - rect.width;
     const maxY = window.innerHeight - rect.height;
 
     if (el.offsetLeft > maxX) el.style.left = Math.max(0, maxX) + "px";
     if (el.offsetTop > maxY) el.style.top = Math.max(0, maxY) + "px";
-  });
+    if (el.offsetLeft < 0) el.style.left = "0px";
+    if (el.offsetTop < 0) el.style.top = "0px";
 }
 
 // Responsive default positions
@@ -108,8 +112,19 @@ makeDraggable(mainCard, "mainCardPos", getMainCardDefault());
 
 // Credit card - bottom right
 const creditCard = document.querySelector(".image-credit");
+const creditToggle = document.getElementById("creditToggle");
 if (creditCard) {
   makeDraggable(creditCard, "creditCardPos", getCreditCardDefault());
+}
+
+if (creditCard && creditToggle) {
+  creditToggle.addEventListener("click", () => {
+    const expanded = creditCard.classList.toggle("expanded");
+    creditToggle.textContent = expanded ? "-" : "+";
+    creditToggle.setAttribute("aria-expanded", String(expanded));
+    creditToggle.setAttribute("aria-label", expanded ? "Collapse prompt" : "Expand prompt");
+    requestAnimationFrame(() => clampToViewport(creditCard));
+  });
 }
 
 // Menu functionality
@@ -175,8 +190,17 @@ const siteAssetUrl = path => new URL(path, document.baseURI).toString();
 fetch(siteAssetUrl('images/manifest.json'))
   .then(r => r.json())
   .then(manifest => {
+    if (!manifest.length) return;
     const pick = manifest[Math.floor(Math.random() * manifest.length)];
-    document.querySelector('.bg').style.setProperty('--bg-image', `url('${siteAssetUrl(`images/${pick.filename}`)}')`);
+    const bg = document.querySelector('.bg');
+    const imageUrl = siteAssetUrl(`images/${pick.filename}`);
+    const preload = new Image();
+    preload.decoding = 'async';
+    preload.onload = () => {
+      bg.style.setProperty('--bg-image', `url('${imageUrl}')`);
+      bg.classList.add('loaded');
+    };
+    preload.src = imageUrl;
     document.getElementById('prompt-model').textContent = pick.llm_model.split('/').pop();
     document.getElementById('image-model').textContent = pick.image_model.replace('.safetensors', '');
     document.getElementById('prompt-text').textContent = pick.prompt;
