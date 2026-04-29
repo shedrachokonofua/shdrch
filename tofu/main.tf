@@ -43,7 +43,6 @@ locals {
   rgw_endpoint             = "https://s3.home.shdr.ch"
   k8s_oidc_issuer          = "oidc.k8s.home.shdr.ch"
   gitlab_oidc_issuer       = "gitlab.home.shdr.ch"
-  k8s_oidc_provider_arn    = "arn:aws:iam::${var.rgw_account_id}:oidc-provider/${local.k8s_oidc_issuer}"
   gitlab_oidc_provider_arn = "arn:aws:iam::${var.rgw_account_id}:oidc-provider/${local.gitlab_oidc_issuer}"
   cron_role_arn            = "arn:aws:iam::${var.rgw_account_id}:role/shdrch-cron"
   image                    = "registry.gitlab.home.shdr.ch/so/shdrch:latest"
@@ -112,6 +111,15 @@ resource "aws_s3_bucket_policy" "shdrch_public_read" {
 
 # ─── RGW: IAM Roles + Policies (cron + deploy) ───────────────────────────────
 
+resource "aws_iam_openid_connect_provider" "k8s" {
+  provider       = aws.rgw
+  url            = "https://${local.k8s_oidc_issuer}"
+  client_id_list = ["sts.amazonaws.com"]
+  thumbprint_list = [
+    "3B73C17E3DF87CF3AA77F1389219EB5EDD519E7F",
+  ]
+}
+
 resource "aws_iam_role" "shdrch_cron" {
   provider = aws.rgw
   name     = "shdrch-cron"
@@ -119,7 +127,7 @@ resource "aws_iam_role" "shdrch_cron" {
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
-      Principal = { Federated = local.k8s_oidc_provider_arn }
+      Principal = { Federated = aws_iam_openid_connect_provider.k8s.arn }
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = {
@@ -196,6 +204,8 @@ resource "kubernetes_secret_v1" "env" {
     AWS_ROLE_ARN                = aws_iam_role.shdrch_cron.arn
     AWS_WEB_IDENTITY_TOKEN_FILE = "/var/run/secrets/sts/token"
     AWS_REGION                  = "us-east-1"
+    AWS_ENDPOINT_URL            = local.rgw_endpoint
+    AWS_ENDPOINT_URL_STS        = local.rgw_endpoint
   }
 }
 
