@@ -14,11 +14,6 @@
   <meta property="og:description" content="Shedrach's home page.">
   <meta property="og:site_name" content="shdrch">
 
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:url" content="https://shdr.ch">
-  <meta name="twitter:title" content="shdrch">
-  <meta name="twitter:description" content="Shedrach's home page.">
-
   <meta name="theme-color" content="#0a0a0a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -40,8 +35,16 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/styles.css?v=__ASSET_VERSION__">
+
+  <noscript>
+    <style>
+      .image-credit { display: none; }
+      #ip { display: none; }
+    </style>
+  </noscript>
 </head>
 
 <body>
@@ -59,7 +62,7 @@
     </symbol>
   </svg>
 
-  <div class="bg" style="--bg-image: var(--bg-image, none)"></div>
+  <div class="bg"></div>
   <div class="overlay"></div>
 
   <!-- Menu button -->
@@ -85,24 +88,22 @@
   </div>
 
   <main class="container" itemscope itemtype="https://schema.org/Person">
-    <h1 class="greeting">$ hello, <span id="ip"></span></h1>
+    <h1 class="greeting">$ hello, <span id="ip" class="skeleton" aria-hidden="true"></span></h1>
     <meta itemprop="name" content="shdrch">
     <nav aria-label="Social links">
       <ul>
         <li>
-          <a class="link" href="https://github.com/shedrachokonofua" rel="me noopener" target="_blank" itemprop="sameAs"
-            aria-label="GitHub profile">
+          <a class="link" href="https://github.com/shedrachokonofua" rel="me noopener" target="_blank" itemprop="sameAs">
             github
           </a>
         </li>
         <li>
-          <a href="https://linkedin.com/in/shdrch" rel="me noopener" target="_blank" itemprop="sameAs"
-            aria-label="LinkedIn profile">
+          <a href="https://linkedin.com/in/shdrch" rel="me noopener" target="_blank" itemprop="sameAs">
             linkedin
           </a>
         </li>
         <li>
-          <a href="mailto:s@shdr.ch" itemprop="email" aria-label="Send email">
+          <a href="mailto:s@shdr.ch" itemprop="email">
             email
           </a>
         </li>
@@ -115,8 +116,8 @@
   <aside class="image-credit" title="This background was AI-generated">
     <div class="credit-header">
       <div class="meta">
-        <span><span class="label">prompt model:</span> <span id="prompt-model"></span></span>
-        <span><span class="label">image model:</span> <span id="image-model"></span></span>
+        <span><span class="label">prompt model:</span> <span id="prompt-model" class="skeleton"></span></span>
+        <span><span class="label">image model:</span> <span id="image-model" class="skeleton"></span></span>
       </div>
       <button class="credit-toggle" id="creditToggle" type="button" aria-label="See prompt" aria-expanded="false">
         <span id="creditToggleText">see prompt</span>

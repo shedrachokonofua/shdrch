@@ -11,7 +11,7 @@ function getViewportPadding(options) {
   return options.padding ?? 0;
 }
 
-function getStoredPosition(el, edgeAnchored = false) {
+function computePosition(el, edgeAnchored = false) {
   const rect = el.getBoundingClientRect();
   const x = el.offsetLeft;
   const y = el.offsetTop;
@@ -32,7 +32,7 @@ function getStoredPosition(el, edgeAnchored = false) {
 }
 
 function saveStoredPosition(el, storageKey, edgeAnchored = false) {
-  const position = getStoredPosition(el, edgeAnchored);
+  const position = computePosition(el, edgeAnchored);
   localStorage.setItem(storageKey, JSON.stringify(position));
   return position;
 }
@@ -65,12 +65,22 @@ function applyPosition(el, position, edgeAnchored = false) {
   if (Number.isFinite(position.y)) el.style.top = position.y + "px";
 }
 
+function clampToViewport(el, padding = 0) {
+  const rect = el.getBoundingClientRect();
+  const maxX = window.innerWidth - rect.width - padding;
+  const maxY = window.innerHeight - rect.height - padding;
+
+  if (el.offsetLeft > maxX) el.style.left = Math.max(padding, maxX) + "px";
+  if (el.offsetTop > maxY) el.style.top = Math.max(padding, maxY) + "px";
+  if (el.offsetLeft < padding) el.style.left = padding + "px";
+  if (el.offsetTop < padding) el.style.top = padding + "px";
+}
+
 function makeDraggable(el, storageKey, defaultPos, options = {}) {
   let isDragging = false;
-  let startX, startY, initialX, initialY;
+  let startX, startY, initialX, initialY, activePointerId;
   let storedPosition = readStoredPosition(storageKey);
 
-  // Load saved position or use default
   if (storedPosition) {
     applyPosition(el, storedPosition, options.edgeAnchored);
   } else {
@@ -82,76 +92,50 @@ function makeDraggable(el, storageKey, defaultPos, options = {}) {
     if (options.edgeAnchored) storedPosition = saveStoredPosition(el, storageKey, true);
   });
 
-  function onStart(e) {
+  el.addEventListener("pointerdown", (e) => {
     if (e.target.closest("a, button")) return;
     isDragging = true;
+    activePointerId = e.pointerId;
+    el.setPointerCapture(e.pointerId);
     el.classList.add("dragging");
 
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-    startX = clientX;
-    startY = clientY;
+    startX = e.clientX;
+    startY = e.clientY;
     initialX = el.offsetLeft;
     initialY = el.offsetTop;
-  }
+  });
 
-  function onMove(e) {
-    if (!isDragging) return;
+  el.addEventListener("pointermove", (e) => {
+    if (!isDragging || e.pointerId !== activePointerId) return;
     e.preventDefault();
 
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-    const dx = clientX - startX;
-    const dy = clientY - startY;
-
-    let newX = initialX + dx;
-    let newY = initialY + dy;
-
-    const rect = el.getBoundingClientRect();
     const padding = getViewportPadding(options);
+    const rect = el.getBoundingClientRect();
     const maxX = window.innerWidth - rect.width - padding;
     const maxY = window.innerHeight - rect.height - padding;
 
-    newX = Math.max(padding, Math.min(newX, maxX));
-    newY = Math.max(padding, Math.min(newY, maxY));
+    const newX = Math.max(padding, Math.min(initialX + (e.clientX - startX), maxX));
+    const newY = Math.max(padding, Math.min(initialY + (e.clientY - startY), maxY));
 
     el.style.left = newX + "px";
     el.style.top = newY + "px";
-  }
+  });
 
-  function onEnd() {
-    if (!isDragging) return;
+  const endDrag = (e) => {
+    if (!isDragging || e.pointerId !== activePointerId) return;
     isDragging = false;
+    activePointerId = undefined;
     el.classList.remove("dragging");
-
     storedPosition = saveStoredPosition(el, storageKey, options.edgeAnchored);
-  }
-
-  el.addEventListener("mousedown", onStart);
-  document.addEventListener("mousemove", onMove);
-  document.addEventListener("mouseup", onEnd);
-  el.addEventListener("touchstart", onStart, { passive: false });
-  document.addEventListener("touchmove", onMove, { passive: false });
-  document.addEventListener("touchend", onEnd);
+  };
+  el.addEventListener("pointerup", endDrag);
+  el.addEventListener("pointercancel", endDrag);
 
   window.addEventListener("resize", () => {
     storedPosition = readStoredPosition(storageKey) || storedPosition;
     if (options.edgeAnchored) applyPosition(el, storedPosition, true);
     clampToViewport(el, getViewportPadding(options));
   });
-}
-
-function clampToViewport(el, padding = 0) {
-    const rect = el.getBoundingClientRect();
-    const maxX = window.innerWidth - rect.width - padding;
-    const maxY = window.innerHeight - rect.height - padding;
-
-    if (el.offsetLeft > maxX) el.style.left = Math.max(padding, maxX) + "px";
-    if (el.offsetTop > maxY) el.style.top = Math.max(padding, maxY) + "px";
-    if (el.offsetLeft < padding) el.style.left = padding + "px";
-    if (el.offsetTop < padding) el.style.top = padding + "px";
 }
 
 // Responsive default positions
@@ -173,6 +157,13 @@ const getCreditCardDefault = () => {
   };
 };
 
+function animatePositionReset(el, { left, top }) {
+  el.style.transition = "left 0.3s ease, top 0.3s ease";
+  el.style.left = left;
+  el.style.top = top;
+  setTimeout(() => (el.style.transition = ""), 300);
+}
+
 // Main card - top left
 const mainCard = document.querySelector(".container");
 makeDraggable(mainCard, "mainCardPos", getMainCardDefault());
@@ -184,14 +175,13 @@ const creditToggleText = document.getElementById("creditToggleText");
 const creditToggleIcon = document.getElementById("creditToggleIcon");
 const creditStorageKey = "creditCardPos";
 let collapsedCreditPos = null;
+
 if (creditCard) {
   makeDraggable(creditCard, creditStorageKey, getCreditCardDefault(), {
     edgeAnchored: true,
     padding: getEdgePadding,
   });
-}
 
-if (creditCard && creditToggle) {
   creditToggle.addEventListener("click", () => {
     const expanded = creditCard.classList.toggle("expanded");
     creditToggleText.textContent = expanded ? "hide prompt" : "see prompt";
@@ -200,7 +190,7 @@ if (creditCard && creditToggle) {
     creditToggle.setAttribute("aria-label", expanded ? "Hide prompt" : "See prompt");
 
     if (expanded) {
-      collapsedCreditPos = getStoredPosition(creditCard, true);
+      collapsedCreditPos = computePosition(creditCard, true);
       applyPosition(creditCard, collapsedCreditPos, true);
     } else if (collapsedCreditPos) {
       applyPosition(creditCard, collapsedCreditPos, true);
@@ -208,9 +198,7 @@ if (creditCard && creditToggle) {
 
     requestAnimationFrame(() => {
       clampToViewport(creditCard, getEdgePadding());
-      if (!expanded) {
-        saveStoredPosition(creditCard, creditStorageKey, true);
-      }
+      if (!expanded) saveStoredPosition(creditCard, creditStorageKey, true);
     });
   });
 }
@@ -231,48 +219,32 @@ menuBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   const isOpen = menuDropdown.classList.toggle("show");
   menuBtn.classList.toggle("open", isOpen);
-  menuBtn.setAttribute("aria-expanded", isOpen);
+  menuBtn.setAttribute("aria-expanded", String(isOpen));
 });
 
-// Close menu when clicking outside
-document.addEventListener("click", () => {
-  closeMenu();
-});
+document.addEventListener("click", closeMenu);
+menuDropdown.addEventListener("click", (e) => e.stopPropagation());
 
-menuDropdown.addEventListener("click", (e) => {
-  e.stopPropagation();
-});
-
-// Reset positions (no page reload)
 resetBtn.addEventListener("click", () => {
   localStorage.removeItem("mainCardPos");
-  localStorage.removeItem("creditCardPos");
+  localStorage.removeItem(creditStorageKey);
 
-  // Reset main card
-  const mainDefault = getMainCardDefault();
-  mainCard.style.transition = "left 0.3s ease, top 0.3s ease";
-  mainCard.style.left = mainDefault.left;
-  mainCard.style.top = mainDefault.top;
-  setTimeout(() => (mainCard.style.transition = ""), 300);
+  animatePositionReset(mainCard, getMainCardDefault());
 
-  // Reset credit card
   if (creditCard) {
-    const creditDefault = getCreditCardDefault();
-    creditCard.style.transition = "left 0.3s ease, top 0.3s ease";
-    creditCard.style.left = creditDefault.left;
-    creditCard.style.top = creditDefault.top;
+    animatePositionReset(creditCard, getCreditCardDefault());
     saveStoredPosition(creditCard, creditStorageKey, true);
-    setTimeout(() => (creditCard.style.transition = ""), 300);
   }
 
   closeMenu();
 });
 
 // IP greeting
+const ipEl = document.getElementById('ip');
 fetch('https://1.1.1.1/cdn-cgi/trace')
   .then(r => r.text())
-  .then(t => { document.getElementById('ip').textContent = t.match(/^ip=(.+)$/m)[1]; })
-  .catch(() => { document.getElementById('ip').textContent = 'visitor'; });
+  .then(t => { ipEl.textContent = t.match(/^ip=(.+)$/m)[1]; })
+  .catch(() => { ipEl.textContent = 'visitor'; });
 
 // Random background + credit
 const siteAssetUrl = path => new URL(path, document.baseURI).toString();
@@ -293,7 +265,7 @@ function pickRandomImage() {
 }
 
 function setBackground(pick) {
-  if (!pick || !bg) return;
+  if (!pick) return;
 
   const imageUrl = siteAssetUrl(`images/${pick.filename}`);
   const preload = new Image();
