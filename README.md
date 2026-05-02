@@ -41,7 +41,7 @@ On push to `main`, GitLab CI runs secret detection, then:
 1. **build:image** — `linux/amd64` OCI image built with Buildah (amd64 only in CI; Bun cross-arch is not used on runners), pushed to the GitLab registry as `:latest` and the commit SHA tag.
 2. **deploy-site** — Static assets uploaded with `aws s3 cp` to `s3://shdrch`, `index.html` gets `__ASSET_VERSION__` substituted, optional Cloudflare purge when `CF_ZONE_ID` and `CF_API_TOKEN` are set.
 
-There is **no** separate CI job for Kubernetes. The CronJob definition and pull credentials are managed by OpenTofu; the job uses image `registry.gitlab.home.shdr.ch/so/shdrch:latest` with `imagePullPolicy: Always`, so new images are picked up on the next scheduled run after CI pushes.
+The CronJob lives in OpenTofu (`tofu/main.tf`): it runs `registry.gitlab.home.shdr.ch/so/shdrch:latest` with `imagePullPolicy: Always`, so each scheduled run pulls the image CI most recently pushed.
 
 ## URLs
 
