@@ -1,6 +1,6 @@
 # shdr.ch
 
-Personal [website](https://shdr.ch) with AI-generated backgrounds. Built as a static site served from Ceph RGW, with a weekly Kubernetes CronJob that regenerates images via LiteLLM + ComfyUI.
+Personal [website](https://shdr.ch) with AI-generated backgrounds. Static site served from Cloudflare CDN with Ceph RGW as origin, plus a weekly Kubernetes CronJob that regenerates images via LiteLLM + ComfyUI.
 
 ## Architecture
 
