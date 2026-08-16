@@ -28,7 +28,7 @@ const COMFYUI_POLL_INTERVAL_MS = 1000;
 const WEBP_OPTIONS = { quality: 82, effort: 4 };
 
 const llmModels = [
-  'aether/qwen3.5-9b',
+  'aether/qwen3.8-27b',
 ];
 
 const imageModels = [
